@@ -1,0 +1,39 @@
+import { NextResponse } from "next/server";
+import { requireMerchantSession } from "@/lib/auth/require-session";
+import { db } from "@/lib/db";
+import { planSchema } from "@/lib/validators";
+
+export async function GET() {
+  const session = await requireMerchantSession();
+  const plans = await db.customerPlan.findMany({
+    where: { merchantId: session.merchantId },
+    include: { materials: { include: { material: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  return NextResponse.json({ plans });
+}
+
+export async function POST(request: Request) {
+  const session = await requireMerchantSession();
+  const input = planSchema.parse(await request.json());
+  const plan = await db.customerPlan.create({
+    data: {
+      merchantId: session.merchantId,
+      customerName: input.customerName,
+      notes: input.notes,
+      roomImageUrl: input.roomImageUrl,
+      sampleImageUrl: input.sampleImageUrl,
+      originalPrompt: input.originalPrompt,
+      optimizedPrompt: input.optimizedPrompt,
+      negativePrompt: input.negativePrompt,
+      fidelity: input.fidelity,
+      materials: {
+        create: input.materialIds.map((materialId) => ({ materialId })),
+      },
+    },
+    include: { materials: true },
+  });
+
+  return NextResponse.json({ plan }, { status: 201 });
+}
