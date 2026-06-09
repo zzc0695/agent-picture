@@ -36,3 +36,9 @@ next-env.d.ts
 storage/
 prisma/dev.db
 prisma/dev.db-journal
+prisma/shadow.db
+prisma/shadow.db-journal
+dev.db
+dev.db-journal
+dev-shadow.db
+dev-shadow.db-journal

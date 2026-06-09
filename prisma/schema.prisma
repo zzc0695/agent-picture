@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Merchant {
+  id           String             @id @default(cuid())
+  name         String
+  email        String             @unique
+  passwordHash String
+  createdAt    DateTime           @default(now())
+  materials    Material[]
+  prompts      PromptTemplate[]
+  plans        CustomerPlan[]
+  records      GenerationRecord[]
+}
+
+model Material {
+  id            String         @id @default(cuid())
+  merchantId    String
+  name          String
+  category      String
+  color         String
+  fabric        String
+  priceRange    String
+  sizeNote      String
+  sellingPoints String
+  imageUrl      String
+  createdAt     DateTime       @default(now())
+  merchant      Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  plans         PlanMaterial[]
+}
+
+model PromptTemplate {
+  id         String    @id @default(cuid())
+  merchantId String?
+  title      String
+  category   String
+  body       String
+  isSystem   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+}
+
+model CustomerPlan {
+  id               String             @id @default(cuid())
+  merchantId       String
+  customerName     String
+  notes            String
+  roomImageUrl     String
+  sampleImageUrl   String
+  originalPrompt   String
+  optimizedPrompt  String
+  negativePrompt   String
+  fidelity         String
+  primaryImageUrl  String?
+  similarImageUrls String             @default("[]")
+  shortVideoScript String?
+  socialCopy       String?
+  customerScript   String?
+  status           String             @default("draft")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  merchant         Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  materials        PlanMaterial[]
+  records          GenerationRecord[]
+}
+
+model PlanMaterial {
+  planId     String
+  materialId String
+  plan       CustomerPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  material   Material     @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@id([planId, materialId])
+}
+
+model GenerationRecord {
+  id            String        @id @default(cuid())
+  merchantId    String
+  planId        String?
+  type          String
+  inputSummary  String
+  status        String
+  failureReason String?
+  usageUnits    Int           @default(1)
+  createdAt     DateTime      @default(now())
+  merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  plan          CustomerPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+}
