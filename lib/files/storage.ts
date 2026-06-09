@@ -6,6 +6,14 @@ function storageRoot() {
   return process.env.LOCAL_FILE_ROOT ?? "./storage";
 }
 
+export function isSupportedImageFile(file: File) {
+  if (file.type.startsWith("image/")) return true;
+
+  return [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(
+    path.extname(file.name).toLowerCase(),
+  );
+}
+
 export async function saveUploadedFile(file: File) {
   const bytes = Buffer.from(await file.arrayBuffer());
   const extension = path.extname(file.name) || ".jpg";

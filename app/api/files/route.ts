@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { saveUploadedFile } from "@/lib/files/storage";
+import { isSupportedImageFile, saveUploadedFile } from "@/lib/files/storage";
 
 export async function POST(request: Request) {
   const form = await request.formData();
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "请选择图片文件" }, { status: 400 });
   }
 
-  if (!file.type.startsWith("image/")) {
+  if (!isSupportedImageFile(file)) {
     return NextResponse.json({ error: "只支持图片文件" }, { status: 400 });
   }
 

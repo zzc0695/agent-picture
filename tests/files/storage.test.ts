@@ -30,4 +30,11 @@ describe("file storage", () => {
       readFile(path.join(testRoot, url.replace(/^\//, "")), "utf8"),
     ).resolves.toBe("image-bytes");
   });
+
+  it("accepts image file extensions when multipart MIME is missing", async () => {
+    const { isSupportedImageFile } = await import("@/lib/files/storage");
+    const file = new File(["image-bytes"], "room.png", { type: "" });
+
+    expect(isSupportedImageFile(file)).toBe(true);
+  });
 });
