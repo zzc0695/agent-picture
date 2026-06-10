@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import {
+  requireMerchantSession,
+  unauthorizedResponse,
+} from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 import { planSchema } from "@/lib/validators";
 
 export async function GET() {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const plans = await db.customerPlan.findMany({
     where: { merchantId: session.merchantId },
     include: { materials: { include: { material: true } } },
@@ -16,6 +20,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const parsed = planSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(

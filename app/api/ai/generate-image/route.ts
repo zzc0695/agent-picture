@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { generateEffectImage } from "@/lib/ai/image";
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import {
+  requireMerchantSession,
+  unauthorizedResponse,
+} from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 import { fidelitySchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const body = await request.json();
   const parsedFidelity = fidelitySchema.safeParse(body.fidelity ?? "strict");
   if (!parsedFidelity.success) {

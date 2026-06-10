@@ -1,8 +1,8 @@
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import { requirePageMerchantSession } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 
 export default async function PromptsPage() {
-  const session = await requireMerchantSession();
+  const session = await requirePageMerchantSession();
   const templates = await db.promptTemplate.findMany({
     where: { OR: [{ isSystem: true }, { merchantId: session.merchantId }] },
     orderBy: [{ isSystem: "desc" }, { createdAt: "desc" }],

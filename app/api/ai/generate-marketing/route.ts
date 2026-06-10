@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { generateMarketingCopy } from "@/lib/ai/marketing";
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import {
+  requireMerchantSession,
+  unauthorizedResponse,
+} from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const body = await request.json();
   const result = await generateMarketingCopy({
     materialSummary: String(body.materialSummary ?? ""),

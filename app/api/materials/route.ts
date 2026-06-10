@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import {
+  requireMerchantSession,
+  unauthorizedResponse,
+} from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 import { materialSchema } from "@/lib/validators";
 
 export async function GET() {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const materials = await db.material.findMany({
     where: { merchantId: session.merchantId },
     orderBy: { createdAt: "desc" },
@@ -15,6 +19,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const parsed = materialSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(

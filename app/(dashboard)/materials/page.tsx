@@ -1,9 +1,9 @@
 import { MaterialCard } from "@/components/material-card";
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import { requirePageMerchantSession } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 
 export default async function MaterialsPage() {
-  const session = await requireMerchantSession();
+  const session = await requirePageMerchantSession();
   const materials = await db.material.findMany({
     where: { merchantId: session.merchantId },
     orderBy: { createdAt: "desc" },

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import {
+  requireMerchantSession,
+  unauthorizedResponse,
+} from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 import { planSchema } from "@/lib/validators";
 
@@ -8,6 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const { id } = await params;
   const plan = await db.customerPlan.findFirst({
     where: { id, merchantId: session.merchantId },
@@ -26,6 +30,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const { id } = await params;
   const parsed = planSchema.partial().safeParse(await request.json());
   if (!parsed.success) {

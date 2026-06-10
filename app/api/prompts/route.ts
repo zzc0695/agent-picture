@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import {
+  requireMerchantSession,
+  unauthorizedResponse,
+} from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 import { promptTemplateSchema } from "@/lib/validators";
 
 export async function GET() {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const templates = await db.promptTemplate.findMany({
     where: { OR: [{ isSystem: true }, { merchantId: session.merchantId }] },
     orderBy: [{ isSystem: "desc" }, { createdAt: "desc" }],
@@ -15,6 +19,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
   const parsed = promptTemplateSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(

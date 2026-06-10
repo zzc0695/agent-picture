@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { POST } from "@/app/api/materials/route";
+import { GET, POST } from "@/app/api/materials/route";
+import { requireMerchantSession } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -7,11 +8,14 @@ vi.mock("@/lib/auth/require-session", () => ({
     merchantId: "merchant_1",
     email: "demo@example.com",
   })),
+  unauthorizedResponse: () =>
+    Response.json({ error: "请先登录" }, { status: 401 }),
 }));
 
 vi.mock("@/lib/db", () => ({
   db: {
     material: {
+      findMany: vi.fn(),
       create: vi.fn(),
     },
   },
@@ -28,6 +32,18 @@ function jsonRequest(body: unknown) {
 describe("materials API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("returns 401 when the merchant is not logged in", async () => {
+    vi.mocked(requireMerchantSession).mockResolvedValueOnce(null as never);
+
+    const response = await GET();
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "请先登录",
+    });
+    expect(db.material.findMany).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid material payloads", async () => {

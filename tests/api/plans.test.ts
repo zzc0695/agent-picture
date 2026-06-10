@@ -7,6 +7,8 @@ vi.mock("@/lib/auth/require-session", () => ({
     merchantId: "merchant_1",
     email: "demo@example.com",
   })),
+  unauthorizedResponse: () =>
+    Response.json({ error: "请先登录" }, { status: 401 }),
 }));
 
 vi.mock("@/lib/db", () => ({

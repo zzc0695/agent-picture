@@ -1,9 +1,9 @@
 import { CustomerPlanCard } from "@/components/customer-plan-card";
-import { requireMerchantSession } from "@/lib/auth/require-session";
+import { requirePageMerchantSession } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 
 export default async function PlansPage() {
-  const session = await requireMerchantSession();
+  const session = await requirePageMerchantSession();
   const plans = await db.customerPlan.findMany({
     where: { merchantId: session.merchantId },
     orderBy: { updatedAt: "desc" },

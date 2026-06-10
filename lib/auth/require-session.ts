@@ -1,16 +1,28 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
+import type { MerchantSession } from "@/lib/auth/session";
 import { readSessionToken, sessionCookieName } from "@/lib/auth/session";
 
-export async function requireMerchantSession() {
+export async function getMerchantSession(): Promise<MerchantSession | null> {
   const jar = await cookies();
-  const session = await readSessionToken(jar.get(sessionCookieName)?.value);
+  return readSessionToken(jar.get(sessionCookieName)?.value);
+}
 
+export async function requireMerchantSession() {
+  const session = await getMerchantSession();
+  return session;
+}
+
+export async function requirePageMerchantSession() {
+  const session = await getMerchantSession();
   if (!session) {
-    throw new Response(JSON.stringify({ error: "请先登录" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+    redirect("/login");
   }
 
   return session;
+}
+
+export function unauthorizedResponse() {
+  return NextResponse.json({ error: "请先登录" }, { status: 401 });
 }
