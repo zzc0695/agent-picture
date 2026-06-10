@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
+import {
+  requireMerchantSession,
+  unauthorizedResponse,
+} from "@/lib/auth/require-session";
 import { isSupportedImageFile, saveUploadedFile } from "@/lib/files/storage";
 
 export async function POST(request: Request) {
+  const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
+
   const form = await request.formData();
   const file = form.get("file");
 
