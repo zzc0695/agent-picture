@@ -49,37 +49,38 @@ describe("WorkbenchPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the mobile proposal flow from the design reference", async () => {
+  it("renders the AI studio proposal flow from the new design reference", async () => {
     const user = userEvent.setup();
     mockApiResponses();
 
     render(<WorkbenchPage />);
 
-    expect(screen.getByText("王女士 · 客厅窗帘方案")).toBeInTheDocument();
-    expect(screen.getByText("房间图")).toBeInTheDocument();
-    expect(screen.getByText("样本")).toBeInTheDocument();
-    expect(screen.getByText("要求")).toBeInTheDocument();
-    expect(screen.getByText("出图")).toBeInTheDocument();
+    expect(screen.getByText("设计工作室")).toBeInTheDocument();
+    expect(screen.getByText("王女士 · 客厅")).toBeInTheDocument();
+    expect(screen.getByText("步骤 01 - 空间与材质")).toBeInTheDocument();
+    expect(screen.getByText("客户空间")).toBeInTheDocument();
+    expect(screen.getByText("材质样本")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "保存草稿" }),
+      screen.getByRole("button", { name: "更多操作" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "下一步：生成要求" }),
+      screen.getByRole("button", { name: "进入下一步" }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "下一步：生成要求" }));
-    expect(screen.getByRole("heading", { name: "生成要求" })).toBeInTheDocument();
-    expect(screen.getByText("从提示词库选择")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    expect(screen.getByText("生成要求")).toBeInTheDocument();
+    expect(screen.getByText("步骤 02 · 核心构思")).toBeInTheDocument();
+    expect(screen.getByText("模板库")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "生成效果图" }));
-    expect(screen.getByRole("heading", { name: "生成结果" })).toBeInTheDocument();
-    expect(screen.getByText("本次生成条件")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    expect(screen.getByText("效果呈现")).toBeInTheDocument();
+    expect(screen.getByText("渲染方案 01")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "保存方案" }));
-    expect(screen.getByRole("heading", { name: "客户展示" })).toBeInTheDocument();
-    expect(screen.getByText("朋友圈文案")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "进入方案展示" }));
+    expect(screen.getByText("方案展示")).toBeInTheDocument();
+    expect(screen.getByText("社交分享方案")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "分享给客户" }),
+      screen.getByRole("button", { name: "发送给客户" }),
     ).toBeInTheDocument();
   });
 
@@ -89,18 +90,18 @@ describe("WorkbenchPage", () => {
 
     render(<WorkbenchPage />);
 
-    await user.click(screen.getByRole("button", { name: "下一步：生成要求" }));
-    await user.click(screen.getByRole("button", { name: "优化提示词" }));
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "AI 润色" }));
     expect(await screen.findByDisplayValue("优化后的窗帘效果图提示词")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "生成效果图" }));
-    expect(await screen.findByRole("heading", { name: "生成结果" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "营销内容" }));
+    await user.click(screen.getByRole("button", { name: "生成营销文案" }));
     expect(await screen.findByText("接口返回的朋友圈文案")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "保存方案" }));
-    expect(await screen.findByRole("heading", { name: "客户展示" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "进入方案展示" }));
+    expect(await screen.findByText("方案展示")).toBeInTheDocument();
     expect(screen.getByText("接口返回的客户沟通话术")).toBeInTheDocument();
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -127,8 +128,8 @@ describe("WorkbenchPage", () => {
 
     render(<WorkbenchPage />);
 
-    await user.click(screen.getByRole("button", { name: "下一步：生成要求" }));
-    await user.click(screen.getByRole("button", { name: /从提示词库选择/ }));
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: /模板库/ }));
 
     expect(screen.getByRole("dialog", { name: "提示词库" })).toBeInTheDocument();
     expect(
@@ -151,22 +152,22 @@ describe("WorkbenchPage", () => {
 
     render(<WorkbenchPage />);
 
-    await user.click(screen.getByRole("button", { name: "下一步：生成要求" }));
-    await user.click(screen.getByRole("button", { name: "生成效果图" }));
-    await user.click(await screen.findByRole("button", { name: "保存方案" }));
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    await user.click(await screen.findByRole("button", { name: "进入方案展示" }));
 
-    expect(await screen.findByRole("heading", { name: "客户展示" })).toBeInTheDocument();
-    expect(screen.getByText("朋友圈文案")).toBeInTheDocument();
+    expect(await screen.findByText("方案展示")).toBeInTheDocument();
+    expect(screen.getByText("社交分享方案")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "方案详情" }));
+    await user.click(screen.getByRole("button", { name: "方案细节" }));
 
-    expect(screen.getByRole("heading", { name: "方案详情" })).toBeInTheDocument();
+    expect(screen.getByText("方案细节")).toBeInTheDocument();
     expect(screen.getByText("客户：王女士")).toBeInTheDocument();
     expect(screen.getByText("还原度：平衡")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "方案效果" }));
+    await user.click(screen.getByRole("button", { name: "展示效果" }));
 
-    expect(screen.getByText("朋友圈文案")).toBeInTheDocument();
+    expect(screen.getByText("社交分享方案")).toBeInTheDocument();
   });
 });
 

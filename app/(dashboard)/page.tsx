@@ -1,15 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+/* eslint-disable @next/next/no-img-element */
 
-const steps = ["房间图", "样本", "要求", "出图"];
+import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  Copy,
+  Download,
+  Focus,
+  Image as ImageIcon,
+  LayoutGrid,
+  LayoutTemplate,
+  MoreHorizontal,
+  MoveRight,
+  Plus,
+  Quote,
+  RefreshCw,
+  Scale,
+  Share2,
+  SlidersHorizontal,
+  Sparkles,
+  UploadCloud,
+  Wand2,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
 const customerName = "王女士";
-const planName = "客厅窗帘方案";
+const planName = "客厅";
 
 const roomPrompt =
-  "现代轻奢风格客厅，窗帘采用米色绒布拼接白纱帘，落地款，搭配金色金属轨道。沙发选用浅灰色，搭配米色与墨绿色靠垫，地毯为浅灰色。整体色调温暖明亮，空间通透，细节精致，营造优雅舒适的氛围。";
+  "现代轻奢风格客厅，窗帘采用米色绒布拼接白色纱帘，落地款，搭配金色金属轨道。\n\n沙发选用浅灰色，搭配米色与墨绿色靠垫。\n\n整体氛围要求温暖、明亮并且具有精致的纹理感，灯光柔和。";
 
-const promptTags = ["现代简约", "高透光", "米白色", "保留窗户结构"];
+const promptTags = ["现代极简", "高遮光度", "奶油暖白", "保留窗户结构"];
 const promptTemplates = [
   {
     title: "客厅现代简约窗帘",
@@ -27,26 +52,56 @@ const promptTemplates = [
     body: "保持房间透视和光线方向，为窗户搭配轻奢质感窗帘，突出垂感、色彩协调和空间升级效果，适合给客户展示成交前方案。",
   },
 ];
+
+const materialSummary = "米白高遮光绒布窗帘，垂感好，搭配白纱帘和金色轨道";
 const demoRoomImageUrl = "/demo/room-before.jpg";
 const demoSampleImageUrl = "/demo/curtain-sample.jpg";
-const materialSummary = "米白高遮光绒布窗帘，垂感好，搭配白纱帘和金色轨道";
 
-const samples = [
-  ["curtain-swatch-a", "米色布料"],
-  ["curtain-swatch-b", "白纱帘"],
-  ["curtain-swatch-c", "绑带样本"],
-  ["curtain-swatch-d", "金色轨道"],
-] as const;
+const IMAGES = {
+  room: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+  fabric1: "https://images.unsplash.com/photo-1583847268964-b28e50bc78d3?auto=format&fit=crop&w=200&q=80",
+  fabric2: "https://images.unsplash.com/photo-1563298723-dcfebaa392e3?auto=format&fit=crop&w=200&q=80",
+  fabric3: "https://images.unsplash.com/photo-1596484552834-58eb4ea79eb6?auto=format&fit=crop&w=200&q=80",
+  hardware: "https://images.unsplash.com/photo-1610824771380-390c72f79f11?auto=format&fit=crop&w=200&q=80",
+  result: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&q=80",
+};
+
+function isRenderableImageUrl(url: string) {
+  return (
+    Boolean(url) &&
+    !url.startsWith("/demo/") &&
+    url !== "/sample-material.jpg"
+  );
+}
 
 const fidelityOptions = [
-  ["strict", "严格还原", "最大程度还原样本与房间"],
-  ["balanced", "平衡", "兼顾还原与整体效果优化"],
-  ["creative", "创意参考", "在参考基础上创意设计"],
-] as const;
+  ["strict", "严格", "精确匹配", Focus],
+  ["balanced", "平衡", "自然融合", Scale],
+  ["creative", "创意", "发散灵感", Sparkles],
+] as const satisfies readonly (readonly [
+  string,
+  string,
+  string,
+  LucideIcon,
+])[];
 
 type FlowStep = 0 | 1 | 2 | 3;
-type Fidelity = (typeof fidelityOptions)[number][0];
+type Fidelity = "strict" | "balanced" | "creative";
 type CustomerTab = "effect" | "details";
+
+const pageEase = [0.22, 1, 0.36, 1] as [number, number, number, number];
+
+const pageTransition = {
+  initial: { opacity: 0, y: 15, filter: "blur(4px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: {
+    opacity: 0,
+    y: -15,
+    filter: "blur(4px)",
+    transition: { duration: 0.2 },
+  },
+  transition: { duration: 0.5, ease: pageEase },
+};
 
 export default function WorkbenchPage() {
   const [activeStep, setActiveStep] = useState<FlowStep>(0);
@@ -61,12 +116,12 @@ export default function WorkbenchPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
   const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
-  const contentRef = useRef<HTMLElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!contentRef.current) return;
-    contentRef.current.scrollTop = 0;
-    contentRef.current.scrollTo?.({ top: 0 });
+    if (typeof frameRef.current?.scrollTo === "function") {
+      frameRef.current.scrollTo({ top: 0 });
+    }
   }, [activeStep, customerTab]);
 
   async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -171,56 +226,63 @@ export default function WorkbenchPage() {
   }
 
   return (
-    <div className="proposal-stage">
-      <div className="phone-frame">
-        <div className="phone-screen">
-          <StatusBar />
-          <Header
-            activeStep={activeStep}
-            customerTab={customerTab}
-            onCustomerTabChange={setCustomerTab}
-            onStepChange={setActiveStep}
-          />
-          <main
-            ref={contentRef}
-            className="mobile-flow-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-24"
-          >
+    <div className="studio-page flex min-h-[calc(100dvh-58px)] items-center justify-center">
+      <div ref={frameRef} className="mobile-studio-frame">
+        <div className="relative h-full min-h-0 flex-1 overflow-hidden">
+          <AnimatePresence mode="wait">
             {activeStep === 0 ? (
-              <RoomStep onNext={() => setActiveStep(1)} />
+              <PageWrapper id="editor">
+                <EditorView
+                  onBack={() => undefined}
+                  onNext={() => setActiveStep(1)}
+                />
+              </PageWrapper>
             ) : null}
             {activeStep === 1 ? (
-              <RequirementStep
-                prompt={prompt}
-                fidelity={fidelity}
-                onPromptChange={setPrompt}
-                onFidelityChange={setFidelity}
-                busyAction={busyAction}
-                onOpenPromptLibrary={() => setPromptLibraryOpen(true)}
-                onOptimize={optimizePrompt}
-                onGenerate={() => generateImage()}
-              />
+              <PageWrapper id="requirements">
+                <RequirementsView
+                  prompt={prompt}
+                  fidelity={fidelity}
+                  busyAction={busyAction}
+                  onBack={() => setActiveStep(0)}
+                  onPromptChange={setPrompt}
+                  onFidelityChange={setFidelity}
+                  onOpenPromptLibrary={() => setPromptLibraryOpen(true)}
+                  onOptimize={optimizePrompt}
+                  onNext={() => generateImage()}
+                />
+              </PageWrapper>
             ) : null}
             {activeStep === 2 ? (
-              <ResultStep
-                fidelity={fidelity}
-                shortVideoScript={shortVideoScript}
-                socialCopy={socialCopy}
-                customerScript={customerScript}
-                busyAction={busyAction}
-                onSimilar={() => generateImage(imageUrl)}
-                onMarketing={generateMarketing}
-                onCustomerView={savePlan}
-              />
+              <PageWrapper id="result">
+                <ResultView
+                  imageUrl={imageUrl}
+                  shortVideoScript={shortVideoScript}
+                  socialCopy={socialCopy}
+                  customerScript={customerScript}
+                  busyAction={busyAction}
+                  onBack={() => setActiveStep(1)}
+                  onSimilar={() => generateImage(imageUrl)}
+                  onMarketing={generateMarketing}
+                  onNext={savePlan}
+                />
+              </PageWrapper>
             ) : null}
             {activeStep === 3 ? (
-              <CustomerStep
-                customerTab={customerTab}
-                fidelity={fidelity}
-                socialCopy={socialCopy}
-                customerScript={customerScript}
-              />
+              <PageWrapper id="display">
+                <DisplayView
+                  customerTab={customerTab}
+                  fidelity={fidelity}
+                  imageUrl={imageUrl}
+                  socialCopy={socialCopy}
+                  customerScript={customerScript}
+                  onBack={() => setActiveStep(2)}
+                  onCustomerTabChange={setCustomerTab}
+                />
+              </PageWrapper>
             ) : null}
-          </main>
+          </AnimatePresence>
+
           {promptLibraryOpen ? (
             <PromptLibrarySheet
               onClose={() => setPromptLibraryOpen(false)}
@@ -242,360 +304,710 @@ export default function WorkbenchPage() {
   );
 }
 
-function StatusBar() {
+function PageWrapper({ children, id }: { children: ReactNode; id: string }) {
   return (
-    <div className="flex h-9 shrink-0 items-end justify-between bg-white px-7 pb-1 text-[13px] font-semibold text-neutral-950">
-      <span>10:32</span>
-      <div className="flex items-center gap-1.5">
-        <span className="flex h-3.5 items-end gap-0.5" aria-hidden="true">
-          <span className="h-1.5 w-1 rounded-sm bg-neutral-950" />
-          <span className="h-2 w-1 rounded-sm bg-neutral-950" />
-          <span className="h-2.5 w-1 rounded-sm bg-neutral-950" />
-          <span className="h-3 w-1 rounded-sm bg-neutral-950" />
-        </span>
-        <span className="text-[11px]" aria-hidden="true">
-          WiFi
-        </span>
-        <span className="inline-flex h-3 w-5 rounded-[3px] border border-neutral-900 p-0.5">
-          <span className="h-full w-3 rounded-[1px] bg-neutral-900" />
-        </span>
-      </div>
-    </div>
+    <motion.div
+      key={id}
+      {...pageTransition}
+      className="absolute inset-0 flex flex-col overflow-hidden bg-linen"
+    >
+      {children}
+    </motion.div>
   );
 }
 
-function Header({
-  activeStep,
-  customerTab,
-  onCustomerTabChange,
-  onStepChange,
+function StudioHeader({
+  title,
+  subtitle,
+  onBack,
+  rightIcon,
+  transparent = false,
 }: {
-  activeStep: FlowStep;
-  customerTab: CustomerTab;
-  onCustomerTabChange: (tab: CustomerTab) => void;
-  onStepChange: (step: FlowStep) => void;
+  title: ReactNode;
+  subtitle?: string;
+  onBack?: () => void;
+  rightIcon?: ReactNode;
+  transparent?: boolean;
 }) {
-  const titles = ["新建客户方案", "生成要求", "生成结果", "客户展示"];
-
   return (
-    <header className="shrink-0 border-b border-neutral-100 bg-white px-4 pb-3">
-      <div className="grid h-11 grid-cols-[40px_1fr_72px] items-center">
-        <button
-          type="button"
-          className="flex size-9 items-center justify-start text-3xl font-light leading-none text-neutral-900"
-          aria-label="返回"
-          onClick={() => onStepChange(activeStep > 0 ? ((activeStep - 1) as FlowStep) : 0)}
+    <header
+      className={`sticky top-0 z-40 flex items-center justify-between px-4 py-3 transition-all ${
+        transparent ? "bg-transparent pt-6" : "glass-panel mx-3 mt-3 rounded-2xl"
+      }`}
+    >
+      <button
+        type="button"
+        aria-label="返回"
+        onClick={onBack}
+        className={`flex size-10 items-center justify-center rounded-full border transition-all ${
+          transparent
+            ? "border-white/20 bg-black/20 text-white backdrop-blur-md hover:bg-black/40"
+            : "border-white bg-white/50 text-stone-600 shadow-sm hover:bg-black/5 hover:text-stone-900"
+        }`}
+      >
+        <ChevronLeft size={22} strokeWidth={1.5} className="-ml-0.5" />
+      </button>
+
+      <div className="flex min-w-0 flex-1 flex-col items-center px-3">
+        <div
+          className={`truncate text-center font-serif text-[17px] font-medium tracking-wide ${
+            transparent ? "text-white drop-shadow-md" : "text-stone-800"
+          }`}
         >
-          ‹
-        </button>
-        <div className="min-w-0 text-center">
-          <h1 className="truncate text-[17px] font-semibold text-neutral-950">
-            {titles[activeStep]}
-          </h1>
-          {activeStep === 0 ? (
-            <p className="mt-1 truncate text-[13px] text-neutral-500">
-              {customerName} · {planName}
-              <span aria-hidden="true">⌄</span>
-            </p>
-          ) : null}
+          {title}
         </div>
-        <div className="flex justify-end gap-2 text-[13px] text-neutral-600">
-          {activeStep === 1 ? (
-            <button
-              type="button"
-              className="flex items-center gap-1 font-medium text-neutral-700"
-            >
-              <span className="grid size-4 place-items-center rounded border border-[#2b8178] text-[10px] text-[#1f6f68]">
-                ▣
-              </span>
-              模板
-            </button>
-          ) : null}
-          {activeStep === 2 ? (
-            <button type="button" className="font-medium text-neutral-600">
-              重新生成
-            </button>
-          ) : null}
-          {activeStep === 3 ? (
-            <button type="button" className="font-medium text-neutral-600">
-              编辑
-            </button>
-          ) : null}
-          {activeStep === 0 ? (
-            <>
-              <button type="button" aria-label="文档" className="text-lg">
-                ▧
-              </button>
-              <button type="button" aria-label="更多" className="text-xl">
-                ⋯
-              </button>
-            </>
-          ) : null}
-        </div>
+        {subtitle ? (
+          <span
+            className={`mt-0.5 truncate text-[10px] font-medium uppercase tracking-widest ${
+              transparent ? "text-white/70" : "text-stone-400"
+            }`}
+          >
+            {subtitle}
+          </span>
+        ) : null}
       </div>
 
-      {activeStep === 0 ? (
-        <ol className="mt-3 grid grid-cols-4 items-start">
-          {steps.map((step, index) => (
-            <li key={step} className="relative text-center">
-              {index > 0 ? (
-                <span className="absolute left-[-50%] top-[13px] h-px w-full bg-neutral-200" />
-              ) : null}
-              <span
-                className={`relative z-10 mx-auto flex size-7 items-center justify-center rounded-full border text-[13px] ${
-                  index === 0
-                    ? "border-[#257b74] bg-[#257b74] text-white"
-                    : "border-neutral-200 bg-white text-neutral-500"
-                }`}
-              >
-                {index + 1}
-              </span>
-              <span className="mt-2 block text-[12px] text-neutral-600">
-                {step}
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-
-      {activeStep === 3 ? (
-        <div className="mt-2 grid grid-cols-2 border-b border-neutral-100 text-center text-[14px] font-medium">
-          <button
-            type="button"
-            className={`border-b-2 pb-3 ${
-              customerTab === "effect"
-                ? "border-[#257b74] text-neutral-950"
-                : "border-transparent text-neutral-500"
-            }`}
-            onClick={() => onCustomerTabChange("effect")}
-          >
-            方案效果
-          </button>
-          <button
-            type="button"
-            className={`border-b-2 pb-3 ${
-              customerTab === "details"
-                ? "border-[#257b74] text-neutral-950"
-                : "border-transparent text-neutral-500"
-            }`}
-            onClick={() => onCustomerTabChange("details")}
-          >
-            方案详情
-          </button>
-        </div>
-      ) : null}
+      <div className="flex w-10 justify-end text-stone-600">{rightIcon}</div>
     </header>
   );
 }
 
-function Card({
-  children,
-  className = "",
+function EditorView({
+  onBack,
+  onNext,
 }: {
-  children: React.ReactNode;
-  className?: string;
+  onBack: () => void;
+  onNext: () => void;
 }) {
   return (
-    <section
-      className={`rounded-[10px] border border-neutral-100 bg-white shadow-[0_8px_24px_rgba(31,41,55,0.045)] ${className}`}
-    >
-      {children}
-    </section>
-  );
-}
-
-function RoomStep({ onNext }: { onNext: () => void }) {
-  return (
-    <div className="space-y-3 pt-3">
-      <Card className="overflow-hidden p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold">客户房间图</h2>
-          <button type="button" className="text-[12px] text-neutral-500">
-            ▧ 示例
-          </button>
-        </div>
-        <div className="relative">
-          <RoomScene variant="empty" />
-          <span className="absolute bottom-3 left-3 rounded-md bg-black/42 px-2 py-1 text-[12px] text-white">
-            1/1
-          </span>
-        </div>
-        <div className="mt-3 grid grid-cols-2 divide-x divide-neutral-100 text-center text-[13px] text-neutral-700">
-          <button type="button" className="py-1.5">
-            ⭱ 重新上传
-          </button>
-          <button type="button" className="py-1.5">
-            ▧ 更换房间图
-          </button>
-        </div>
-      </Card>
-
-      <Card className="p-3">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold">窗帘/软装样本</h2>
-          <span className="text-[12px] text-neutral-500">4/6</span>
-        </div>
-        <div className="grid grid-cols-5 gap-2">
-          {samples.map(([sample, label]) => (
-            <button
-              key={sample}
-              type="button"
-              aria-label={label}
-              className={`aspect-square rounded-lg border border-neutral-100 ${sample}`}
-            />
-          ))}
+    <div className="relative flex h-full flex-col">
+      <StudioHeader
+        title="设计工作室"
+        subtitle={`${customerName} · ${planName}`}
+        onBack={onBack}
+        rightIcon={
           <button
             type="button"
-            aria-label="添加样本"
-            className="aspect-square rounded-lg border border-neutral-200 bg-neutral-50 text-3xl font-light text-neutral-600"
+            aria-label="更多操作"
+            className="flex size-8 items-center justify-center rounded-full transition-colors hover:bg-stone-100"
           >
-            +
+            <MoreHorizontal size={18} strokeWidth={1.5} />
           </button>
-        </div>
-      </Card>
+        }
+      />
 
-      <Card className="overflow-hidden p-3">
-        <h2 className="mb-3 text-[15px] font-semibold">待生成效果</h2>
-        <div className="relative overflow-hidden rounded-lg">
-          <RoomScene variant="preview" />
-          <div className="absolute inset-0 grid place-items-center bg-black/22 text-center text-[13px] font-medium leading-6 text-white">
-            生成后将在此处显示效果图
-            <br />
-            支持多次生成对比
-          </div>
-          <span className="absolute left-1/2 top-5 grid size-8 -translate-x-1/2 place-items-center rounded-full bg-white/88 text-lg text-neutral-700 shadow-sm">
-            ↓
+      <div className="hide-scrollbar flex-1 overflow-y-auto px-4 pb-28 pt-6">
+        <div className="mb-8 flex items-center gap-3 px-2">
+          <div className="size-1.5 rounded-full bg-sage shadow-[0_0_8px_rgba(83,98,87,0.6)]" />
+          <span className="text-[11px] font-medium tracking-widest text-sage">
+            步骤 01 - 空间与材质
           </span>
         </div>
-      </Card>
 
-      <BottomActions>
-        <button type="button" className="secondary-action" aria-label="保存草稿">
-          <span aria-hidden="true">▧ </span>
-          保存草稿
-        </button>
-        <button type="button" className="primary-action" onClick={onNext}>
-          下一步：生成要求
-        </button>
-      </BottomActions>
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-8"
+        >
+          <div className="mb-4 flex items-end justify-between px-2">
+            <h2 className="font-serif text-[18px] font-medium text-stone-800">
+              客户空间
+            </h2>
+            <button
+              type="button"
+              className="flex items-center gap-1 text-[11px] tracking-wide text-stone-400 transition-colors hover:text-sage"
+            >
+              示例
+            </button>
+          </div>
+
+          <div className="rounded-[24px] border border-white bg-white p-2 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)]">
+            <div className="group relative aspect-[4/3] overflow-hidden rounded-[16px] bg-stone-50">
+              <img
+                src={IMAGES.room}
+                alt="客户空间"
+                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-x-0 bottom-0 flex items-end justify-between bg-gradient-to-t from-black/40 to-transparent p-4">
+                <div className="rounded-full border border-white/20 bg-white/20 px-2.5 py-1 text-[10px] tracking-wider text-white backdrop-blur-md">
+                  原图
+                </div>
+              </div>
+            </div>
+            <div className="mt-1 flex divide-x divide-stone-100 py-2">
+              <button
+                type="button"
+                className="flex flex-1 items-center justify-center gap-2 text-[12px] font-medium tracking-wide text-stone-500 transition-colors hover:text-sage"
+              >
+                <UploadCloud size={14} strokeWidth={2} />
+                重新上传
+              </button>
+              <button
+                type="button"
+                className="flex flex-1 items-center justify-center gap-2 text-[12px] font-medium tracking-wide text-stone-500 transition-colors hover:text-sage"
+              >
+                <RefreshCw size={14} strokeWidth={2} />
+                更换图片
+              </button>
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8"
+        >
+          <div className="mb-4 flex items-end justify-between px-2">
+            <h2 className="font-serif text-[18px] font-medium text-stone-800">
+              材质样本
+            </h2>
+            <span className="text-[11px] tracking-wide text-stone-400">
+              已选 4 项
+            </span>
+          </div>
+
+          <div className="hide-scrollbar -mx-2 flex gap-4 overflow-x-auto px-2 pb-6 pt-2">
+            {[
+              "curtain-swatch-a",
+              "curtain-swatch-b",
+              "curtain-swatch-c",
+              "curtain-swatch-d",
+            ].map((swatch, index) => (
+                <motion.div
+                  whileHover={{ y: -4, rotate: index % 2 === 0 ? 2 : -2 }}
+                  key={swatch}
+                  aria-label={`材质样本 ${index + 1}`}
+                  className={`group relative h-28 w-24 flex-shrink-0 overflow-hidden rounded-2xl border-[3px] border-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.15)] ${swatch}`}
+                >
+                  <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5" />
+                </motion.div>
+              ))}
+            <button
+              type="button"
+              className="flex h-28 w-24 flex-shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 text-stone-400 transition-all hover:border-sage/30 hover:bg-white hover:text-sage"
+            >
+              <Plus size={20} strokeWidth={1.5} />
+              <span className="text-[10px] font-medium tracking-wider">添加</span>
+            </button>
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex h-24 items-center justify-center rounded-2xl border border-dashed border-stone-200/60 bg-white/40 backdrop-blur-sm">
+            <div className="flex items-center gap-2 text-stone-400">
+              <ImageIcon size={16} strokeWidth={1.5} />
+              <span className="text-[12px] font-medium tracking-wider">
+                等待生成
+              </span>
+            </div>
+          </div>
+        </motion.section>
+      </div>
+
+      <div className="studio-action-bar">
+        <div className="glass-panel flex gap-2 rounded-3xl p-2 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.15)]">
+          <button
+            type="button"
+            aria-label="辅助操作"
+            className="studio-icon-button size-14"
+          >
+            <MoreHorizontal size={20} strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            className="studio-primary-button group relative flex flex-1 items-center justify-center gap-2 overflow-hidden"
+          >
+            <div className="absolute inset-0 h-full w-full -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:animate-[pulse_1.5s_infinite]" />
+            进入下一步
+            <MoveRight size={16} strokeWidth={1.5} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function RequirementStep({
+function RequirementsView({
   prompt,
   fidelity,
+  busyAction,
+  onBack,
   onPromptChange,
   onFidelityChange,
-  busyAction,
   onOpenPromptLibrary,
   onOptimize,
-  onGenerate,
+  onNext,
 }: {
   prompt: string;
   fidelity: Fidelity;
+  busyAction: string | null;
+  onBack: () => void;
   onPromptChange: (value: string) => void;
   onFidelityChange: (value: Fidelity) => void;
-  busyAction: string | null;
   onOpenPromptLibrary: () => void;
   onOptimize: () => void;
-  onGenerate: () => void;
+  onNext: () => void;
 }) {
   return (
-    <div className="space-y-3 pt-3">
-      <Card className="p-3">
-        <div className="mb-3 text-[16px] font-semibold">生成要求</div>
-        <textarea
-          aria-label="生成要求"
-          value={prompt}
-          onChange={(event) => onPromptChange(event.target.value)}
-          className="min-h-48 w-full resize-none rounded-lg border border-neutral-200 bg-white p-3 text-[14px] leading-7 text-neutral-700 outline-none focus:border-[#257b74] focus:ring-2 focus:ring-[#dcefeb]"
-          maxLength={800}
-        />
-        <div className="mt-2 text-right text-[12px] text-neutral-400">
-          {prompt.length}/800
-        </div>
-        <button
-          type="button"
-          className="mt-2 flex w-full items-center justify-between text-[13px] text-neutral-600"
-          onClick={onOpenPromptLibrary}
-        >
-          <span>从提示词库选择</span>
-          <span>⌄</span>
-        </button>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {promptTags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-[13px] text-neutral-700"
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      </Card>
+    <div className="relative flex h-full flex-col">
+      <StudioHeader
+        title="生成要求"
+        subtitle="步骤 02 · 核心构思"
+        onBack={onBack}
+        rightIcon={
+          <button
+            type="button"
+            onClick={onOpenPromptLibrary}
+            className="flex items-center gap-1 text-[11px] font-medium tracking-wider text-sage transition-opacity hover:opacity-80"
+          >
+            <LayoutTemplate size={14} strokeWidth={2} />
+            模板库
+          </button>
+        }
+      />
 
-      <Card className="p-3">
-        <div className="mb-3 flex items-center gap-1">
-          <h2 className="text-[16px] font-semibold">还原度设置</h2>
-          <span className="text-[12px] text-neutral-400">ⓘ</span>
+      <div className="hide-scrollbar flex-1 overflow-y-auto px-4 pb-32 pt-6">
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="relative rounded-[24px] border border-stone-100 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.06)]">
+            <Quote size={24} className="absolute left-4 top-4 text-stone-100" />
+            <textarea
+              aria-label="生成要求"
+              value={prompt}
+              onChange={(event) => onPromptChange(event.target.value)}
+              className="relative z-10 h-40 w-full resize-none bg-transparent font-serif text-[15px] italic leading-relaxed text-stone-700 outline-none placeholder:text-stone-300"
+              placeholder="描述您期望的氛围、材质与光影细节..."
+              spellCheck={false}
+              maxLength={800}
+            />
+            <div className="mt-2 flex items-center justify-between border-t border-stone-50 pt-3">
+              <button
+                type="button"
+                onClick={onOptimize}
+                disabled={busyAction === "optimize"}
+                className="flex items-center gap-1.5 rounded-full bg-sage/5 px-3 py-1.5 text-[11px] font-medium tracking-wide text-sage transition-colors hover:bg-sage/10"
+              >
+                <Wand2 size={12} strokeWidth={2} />
+                {busyAction === "optimize" ? "润色中" : "AI 润色"}
+              </button>
+              <span className="font-mono text-[10px] text-stone-400">
+                {prompt.length} / 800
+              </span>
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-10 px-2"
+        >
+          <h3 className="mb-4 text-[11px] font-medium tracking-widest text-stone-400">
+            精选灵感词
+          </h3>
+          <div className="flex flex-wrap gap-2.5">
+            {promptTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className="rounded-full border border-stone-200 bg-white/50 px-4 py-2 text-[12px] font-medium text-stone-600 shadow-sm backdrop-blur-sm transition-all hover:border-sage hover:text-sage"
+                onClick={() => onPromptChange(`${prompt}${prompt ? "\n" : ""}${tag}`)}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8 px-2"
+        >
+          <h3 className="mb-4 text-[11px] font-medium tracking-widest text-stone-400">
+            还原度控制
+          </h3>
+
+          <div className="grid grid-cols-3 gap-3">
+            {fidelityOptions.map(([id, title, desc, Icon]) => {
+              const active = fidelity === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onFidelityChange(id as Fidelity)}
+                  className={`flex min-h-[92px] flex-col items-center justify-center rounded-2xl border p-3 text-center transition-all ${
+                    active
+                      ? "border-sage bg-sage text-white shadow-lg shadow-sage/20"
+                      : "border-white bg-white/80 text-stone-600 shadow-sm hover:border-stone-300"
+                  }`}
+                >
+                  <Icon size={18} strokeWidth={1.5} className="mb-2" />
+                  <span className="mb-1 text-[12px] font-medium tracking-wide">
+                    {title}
+                  </span>
+                  <span
+                    className={`text-[9px] tracking-wider ${
+                      active ? "text-white/80" : "text-stone-400"
+                    }`}
+                  >
+                    {desc}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </motion.section>
+      </div>
+
+      <div className="studio-action-bar">
+        <div className="glass-panel flex rounded-3xl p-2 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.15)]">
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={busyAction === "generate"}
+            className="studio-primary-button flex w-full items-center justify-center gap-2"
+          >
+            {busyAction === "generate" ? "生成中" : "生成方案效果"}
+            <Sparkles size={16} strokeWidth={1.5} className="text-sand" />
+          </button>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {fidelityOptions.map(([value, label, description]) => (
+      </div>
+    </div>
+  );
+}
+
+function ResultView({
+  imageUrl,
+  shortVideoScript,
+  socialCopy,
+  customerScript,
+  busyAction,
+  onBack,
+  onSimilar,
+  onMarketing,
+  onNext,
+}: {
+  imageUrl: string;
+  shortVideoScript: string;
+  socialCopy: string;
+  customerScript: string;
+  busyAction: string | null;
+  onBack: () => void;
+  onSimilar: () => void;
+  onMarketing: () => void;
+  onNext: () => void;
+}) {
+  const displayImage = isRenderableImageUrl(imageUrl) ? imageUrl : IMAGES.result;
+
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden bg-black text-white">
+      <motion.div
+        initial={{ scale: 1.05, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="absolute inset-0 z-0 bg-stone-900"
+      >
+        <img
+          src={displayImage}
+          alt="生成效果图"
+          className="h-full w-full object-cover opacity-90"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
+      </motion.div>
+
+      <StudioHeader
+        title={<span className="text-[18px]">效果呈现</span>}
+        onBack={onBack}
+        transparent
+        rightIcon={
+          <button
+            type="button"
+            aria-label="重新生成"
+            onClick={onSimilar}
+            disabled={busyAction === "generate"}
+            className="flex size-10 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white backdrop-blur-md transition-colors hover:bg-black/40"
+          >
+            <RefreshCw size={16} strokeWidth={2} />
+          </button>
+        }
+      />
+
+      <div className="z-10 flex flex-1 flex-col justify-end p-6 pb-8">
+        <motion.div
+          initial={{ y: 30, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-[10px] font-medium tracking-widest text-white shadow-sm backdrop-blur-md">
+              渲染方案 01
+            </span>
             <button
-              key={value}
               type="button"
-              onClick={() => onFidelityChange(value)}
-              className={`min-h-20 rounded-lg border p-2 text-center ${
-                fidelity === value
-                  ? "border-[#257b74] bg-[#eef8f6] text-[#1f6f68]"
-                  : "border-neutral-200 bg-white text-neutral-800"
-              }`}
+              className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 backdrop-blur-md transition-colors hover:bg-black/60"
             >
-              <span className="block text-[14px] font-semibold">{label}</span>
-              <span className="mt-1 block text-[11px] leading-5 text-neutral-500">
-                {description}
+              <SlidersHorizontal size={12} className="text-white" />
+              <span className="text-[10px] font-medium tracking-widest text-white">
+                对比原图
               </span>
             </button>
-          ))}
-        </div>
-      </Card>
+          </div>
 
-      <Card className="p-3">
-        <h2 className="mb-3 text-[15px] font-semibold">其他要求（可选）</h2>
-        <textarea
-          aria-label="其他要求"
-          placeholder="如不添加，则将优化为更自然的效果"
-          className="min-h-20 w-full resize-none rounded-lg border border-neutral-200 p-3 text-[13px] outline-none"
-          maxLength={200}
-        />
-        <div className="mt-2 text-right text-[12px] text-neutral-400">0/200</div>
-      </Card>
+          <h1 className="mb-3 font-serif text-[32px] font-medium leading-tight tracking-wide drop-shadow-lg">
+            柔和雅致
+            <br />
+            休憩之境
+          </h1>
+          <p className="mb-6 max-w-[90%] text-[13px] font-light leading-relaxed tracking-wide text-white/90">
+            柔软的触感与温润的米白色调，交织在细腻光影中，为客户呈现宁静、柔软、有呼吸感的空间。
+          </p>
 
-      <BottomActions>
-        <button
-          type="button"
-          className="secondary-action"
-          aria-label="优化提示词"
-          disabled={busyAction === "optimize"}
-          onClick={onOptimize}
-        >
-          <span aria-hidden="true">✧ </span>
-          {busyAction === "optimize" ? "优化中" : "优化提示词"}
-        </button>
-        <button
-          type="button"
-          className="primary-action"
-          aria-label="生成效果图"
-          disabled={busyAction === "generate"}
-          onClick={onGenerate}
-        >
-          <span aria-hidden="true">✦ </span>
-          {busyAction === "generate" ? "生成中" : "生成效果图"}
-        </button>
-      </BottomActions>
+          {shortVideoScript || socialCopy || customerScript ? (
+            <div className="mb-4 max-h-28 overflow-y-auto rounded-[20px] border border-white/10 bg-black/30 p-4 text-[12px] leading-6 text-white/88 backdrop-blur-xl">
+              {shortVideoScript ? <p>{shortVideoScript}</p> : null}
+              {socialCopy ? <p className="mt-2">{socialCopy}</p> : null}
+              {customerScript ? <p className="mt-2">{customerScript}</p> : null}
+            </div>
+          ) : null}
+
+          <div className="mb-4 grid grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={busyAction === "save"}
+              className="col-span-2 flex items-center justify-center gap-2 rounded-[20px] bg-white py-4 text-[13px] font-medium tracking-widest text-stone-900 shadow-xl transition-colors hover:bg-stone-100"
+            >
+              <Share2 size={16} strokeWidth={1.5} />
+              {busyAction === "save" ? "保存中" : "进入方案展示"}
+            </button>
+            <button
+              type="button"
+              aria-label="下载效果图"
+              className="flex items-center justify-center rounded-[20px] border border-white/20 bg-white/10 py-4 text-white backdrop-blur-xl transition-colors hover:bg-white/20"
+            >
+              <Download size={18} strokeWidth={1.5} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={onMarketing}
+              disabled={busyAction === "marketing"}
+              className="flex items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-black/30 py-3.5 text-white backdrop-blur-xl transition-colors hover:bg-black/50"
+            >
+              <Wand2 size={16} strokeWidth={1.5} className="text-stone-300" />
+              <span className="text-[12px] font-medium tracking-widest text-stone-200">
+                {busyAction === "marketing" ? "生成中" : "生成营销文案"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={onSimilar}
+              disabled={busyAction === "generate"}
+              className="flex items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-black/30 py-3.5 text-white backdrop-blur-xl transition-colors hover:bg-black/50"
+            >
+              <LayoutGrid size={16} strokeWidth={1.5} className="text-stone-300" />
+              <span className="text-[12px] font-medium tracking-widest text-stone-200">
+                生成更多方案
+              </span>
+            </button>
+          </div>
+        </motion.div>
+      </div>
     </div>
+  );
+}
+
+function DisplayView({
+  customerTab,
+  fidelity,
+  imageUrl,
+  socialCopy,
+  customerScript,
+  onBack,
+  onCustomerTabChange,
+}: {
+  customerTab: CustomerTab;
+  fidelity: Fidelity;
+  imageUrl: string;
+  socialCopy: string;
+  customerScript: string;
+  onBack: () => void;
+  onCustomerTabChange: (tab: CustomerTab) => void;
+}) {
+  const fidelityLabel =
+    fidelityOptions.find(([value]) => value === fidelity)?.[1] ?? "平衡";
+  const displayImage = isRenderableImageUrl(imageUrl) ? imageUrl : IMAGES.result;
+
+  return (
+    <div className="relative flex h-full flex-col">
+      <StudioHeader
+        title="方案展示"
+        onBack={onBack}
+        rightIcon={
+          <button
+            type="button"
+            className="text-[11px] font-medium tracking-widest text-sage transition-opacity hover:opacity-80"
+          >
+            编辑
+          </button>
+        }
+      />
+
+      <div className="mx-4 mt-4 grid rounded-full bg-white/55 p-1 text-center text-[12px] font-medium text-stone-500 shadow-sm">
+        <div className="grid grid-cols-2 gap-1">
+          <button
+            type="button"
+            onClick={() => onCustomerTabChange("effect")}
+            className={`rounded-full px-3 py-2 transition-all ${
+              customerTab === "effect"
+                ? "bg-sage text-white shadow-md shadow-sage/15"
+                : "hover:text-sage"
+            }`}
+          >
+            展示效果
+          </button>
+          <button
+            type="button"
+            onClick={() => onCustomerTabChange("details")}
+            className={`rounded-full px-3 py-2 transition-all ${
+              customerTab === "details"
+                ? "bg-sage text-white shadow-md shadow-sage/15"
+                : "hover:text-sage"
+            }`}
+          >
+            方案细节
+          </button>
+        </div>
+      </div>
+
+      <div className="hide-scrollbar flex-1 overflow-y-auto px-4 pb-32 pt-4">
+        {customerTab === "details" ? (
+          <div className="space-y-4">
+            <section className="studio-card p-5">
+              <h2 className="font-serif text-[18px] font-medium text-stone-800">
+                方案信息
+              </h2>
+              <div className="mt-5 space-y-3 text-[13px] leading-6 text-stone-600">
+                <div className="rounded-2xl bg-white/55 px-4 py-3">
+                  客户：{customerName}
+                </div>
+                <div className="rounded-2xl bg-white/55 px-4 py-3">
+                  房间：客厅窗帘方案
+                </div>
+                <div className="rounded-2xl bg-white/55 px-4 py-3">
+                  样本：米白高遮光绒布窗帘
+                </div>
+                <div className="rounded-2xl bg-white/55 px-4 py-3">
+                  还原度：{fidelityLabel}
+                </div>
+              </div>
+            </section>
+            <section className="studio-card p-5">
+              <h3 className="font-serif text-[16px] font-medium text-stone-800">
+                生成上下文
+              </h3>
+              <ul className="mt-4 space-y-2 text-[13px] leading-6 text-stone-600">
+                <li>保留原房间结构、窗户位置和透视角度。</li>
+                <li>保留样本主要颜色、材质纹理和自然垂感。</li>
+                <li>避免窗户变形、窗帘位置错误和渲染不真实。</li>
+              </ul>
+            </section>
+          </div>
+        ) : (
+          <>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative mb-8"
+            >
+              <div className="overflow-hidden rounded-[24px] border-4 border-white bg-white shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)]">
+                <img
+                  src={displayImage}
+                  alt="方案展示图"
+                  className="aspect-square w-full object-cover"
+                />
+              </div>
+
+              <div className="absolute -bottom-4 right-6 flex flex-col items-center rounded-full border-2 border-white bg-sage px-5 py-2.5 text-white shadow-lg">
+                <span className="mb-0.5 text-[10px] tracking-widest opacity-80">
+                  风格特征
+                </span>
+                <span className="font-serif text-[13px]">现代极简</span>
+              </div>
+            </motion.div>
+
+            <div className="mt-10 space-y-8 px-2">
+              <CopySection title="社交分享方案">
+                {socialCopy ||
+                  "在喧嚣中寻找宁静。柔软的米色基调配合温润光影，让每一次归家都成为一场治愈之旅。"}
+              </CopySection>
+              <CopySection title="客户沟通话术">
+                {customerScript ||
+                  "这套方案以暖白和米色为基准，最大化引入自然光照。主窗帘推荐采用高克重绒面材质，视觉触感细腻，也能提供稳定遮光包裹感。"}
+              </CopySection>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="studio-action-bar">
+        <button
+          type="button"
+          className="studio-primary-button flex w-full items-center justify-center gap-2"
+        >
+          发送给客户
+          <ArrowRight size={16} strokeWidth={1.5} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CopySection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="mb-3 flex items-end justify-between">
+        <h3 className="font-serif text-[14px] text-stone-800">{title}</h3>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[10px] tracking-widest text-stone-400 transition-colors hover:text-sage"
+        >
+          <Copy size={12} />
+          复制
+        </button>
+      </div>
+      <div className="relative">
+        <div className="absolute bottom-0 left-0 top-0 w-px bg-sand/50" />
+        <p className="pl-4 font-serif text-[13px] leading-relaxed text-stone-600">
+          {children}
+        </p>
+      </div>
+    </motion.section>
   );
 }
 
@@ -612,27 +1024,30 @@ function PromptLibrarySheet({
   const selected = promptTemplates[selectedIndex];
 
   return (
-    <div className="absolute inset-0 z-30 flex items-end bg-black/32">
-      <section
+    <div className="absolute inset-0 z-50 flex items-end bg-black/32">
+      <motion.section
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
         aria-modal="true"
         aria-label="提示词库"
         role="dialog"
-        className="max-h-[78%] w-full overflow-hidden rounded-t-3xl bg-white shadow-[0_-18px_42px_rgba(31,41,55,0.18)]"
+        className="max-h-[78%] w-full overflow-hidden rounded-t-[28px] bg-linen shadow-[0_-18px_42px_rgba(31,41,55,0.18)]"
       >
-        <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-neutral-200" />
-        <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+        <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-stone-300" />
+        <div className="flex items-center justify-between border-b border-stone-200/60 px-4 py-3">
           <div>
-            <h2 className="text-[17px] font-semibold text-neutral-950">
+            <h2 className="font-serif text-[17px] font-medium text-stone-900">
               提示词库
             </h2>
-            <p className="mt-0.5 text-[12px] text-neutral-500">
+            <p className="mt-0.5 text-[12px] text-stone-500">
               先预览，再插入或替换当前内容
             </p>
           </div>
           <button
             type="button"
             aria-label="关闭提示词库"
-            className="grid size-8 place-items-center rounded-full bg-neutral-100 text-lg text-neutral-600"
+            className="grid size-8 place-items-center rounded-full bg-white text-stone-500 shadow-sm"
             onClick={onClose}
           >
             ×
@@ -640,357 +1055,58 @@ function PromptLibrarySheet({
         </div>
 
         <div className="grid max-h-[calc(78vh-132px)] grid-cols-[128px_1fr] overflow-hidden">
-          <div className="space-y-2 overflow-y-auto border-r border-neutral-100 bg-[#f8f8f6] p-3">
+          <div className="hide-scrollbar space-y-2 overflow-y-auto border-r border-stone-200/60 bg-white/42 p-3">
             {promptTemplates.map((template, index) => (
               <button
                 key={template.title}
                 type="button"
-                className={`w-full rounded-xl border px-3 py-3 text-left ${
+                className={`w-full rounded-2xl border px-3 py-3 text-left transition-all ${
                   selectedIndex === index
-                    ? "border-[#257b74] bg-white text-[#1f6f68] shadow-sm"
-                    : "border-transparent bg-transparent text-neutral-700"
+                    ? "border-sage bg-white text-sage shadow-sm"
+                    : "border-transparent bg-transparent text-stone-700"
                 }`}
                 onClick={() => setSelectedIndex(index)}
               >
                 <span className="block text-[13px] font-semibold leading-5">
                   {template.title}
                 </span>
-                <span className="mt-1 block text-[11px] text-neutral-400">
+                <span className="mt-1 block text-[11px] text-stone-400">
                   {template.category}
                 </span>
               </button>
             ))}
           </div>
 
-          <div className="overflow-y-auto p-4">
-            <span className="rounded-md bg-[#eef8f6] px-2 py-1 text-[11px] font-medium text-[#1f6f68]">
+          <div className="hide-scrollbar overflow-y-auto p-4">
+            <span className="rounded-full bg-sage/8 px-3 py-1 text-[11px] font-medium text-sage">
               {selected.category}
             </span>
-            <h3 className="mt-3 text-[16px] font-semibold text-neutral-950">
+            <h3 className="mt-3 font-serif text-[16px] font-medium text-stone-950">
               {selected.title}
             </h3>
-            <p className="mt-3 rounded-xl border border-neutral-100 bg-neutral-50 p-3 text-[13px] leading-6 text-neutral-700">
+            <p className="mt-3 rounded-2xl border border-white bg-white/64 p-3 text-[13px] leading-6 text-stone-700">
               {selected.body}
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 border-t border-neutral-100 bg-white px-4 pb-4 pt-3">
+        <div className="grid grid-cols-2 gap-2 border-t border-stone-200/60 bg-linen px-4 pb-4 pt-3">
           <button
             type="button"
-            className="secondary-action"
+            className="studio-secondary-button"
             onClick={() => onInsert(selected.body)}
           >
             插入到当前
           </button>
           <button
             type="button"
-            className="primary-action"
+            className="studio-primary-button"
             onClick={() => onReplace(selected.body)}
           >
             替换整段
           </button>
         </div>
-      </section>
-    </div>
-  );
-}
-
-function ResultStep({
-  fidelity,
-  shortVideoScript,
-  socialCopy,
-  customerScript,
-  busyAction,
-  onSimilar,
-  onMarketing,
-  onCustomerView,
-}: {
-  fidelity: Fidelity;
-  shortVideoScript: string;
-  socialCopy: string;
-  customerScript: string;
-  busyAction: string | null;
-  onSimilar: () => void;
-  onMarketing: () => void;
-  onCustomerView: () => void;
-}) {
-  const fidelityLabel =
-    fidelityOptions.find(([value]) => value === fidelity)?.[1] ?? "平衡";
-
-  return (
-    <div className="space-y-3 pt-3">
-      <div className="relative overflow-hidden rounded-[12px] border border-[#ddd2c6] bg-white shadow-[0_10px_28px_rgba(31,41,55,0.08)]">
-        <span className="absolute left-3 top-3 z-10 rounded-md bg-[#df7654] px-2.5 py-1.5 text-[12px] font-semibold text-white">
-          最新生成
-        </span>
-        <RoomScene variant="result" />
-        <span className="absolute bottom-3 left-3 rounded-md bg-black/45 px-2 py-1 text-[12px] text-white">
-          1/2
-        </span>
-        <button
-          type="button"
-          className="absolute bottom-3 right-3 rounded-md bg-white px-3 py-2 text-[13px] font-medium text-neutral-800 shadow"
-        >
-          ⇄ 对比原图
-        </button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          ["相似方案", "⌂"],
-          ["营销内容", "▣"],
-          ["保存方案", "▤"],
-        ].map(([label, icon]) => (
-          <button
-            key={label}
-            type="button"
-            className="min-h-[62px] rounded-lg border border-neutral-100 bg-white px-2 py-3 text-[13px] text-neutral-700 shadow-[0_5px_18px_rgba(31,41,55,0.04)]"
-            disabled={
-              (label === "相似方案" && busyAction === "generate") ||
-              (label === "营销内容" && busyAction === "marketing") ||
-              (label === "保存方案" && busyAction === "save")
-            }
-            onClick={
-              label === "保存方案"
-                ? onCustomerView
-                : label === "营销内容"
-                  ? onMarketing
-                  : onSimilar
-            }
-          >
-            <span
-              aria-hidden="true"
-              className="mb-1 block text-[18px] leading-none text-neutral-800"
-            >
-              {icon}
-            </span>
-            {label === "营销内容" && busyAction === "marketing"
-              ? "生成中"
-              : label === "保存方案" && busyAction === "save"
-                ? "保存中"
-                : label}
-          </button>
-        ))}
-      </div>
-
-      <Card className="p-3">
-        <h2 className="border-b border-neutral-100 pb-3 text-[15px] font-semibold">
-          本次生成条件
-        </h2>
-        <ul className="space-y-2 pt-3 text-[13px] text-neutral-600">
-          <li className="flex gap-2">
-            <span className="text-[#257b74]">◎</span>房间结构：已保留
-          </li>
-          <li className="flex gap-2">
-            <span className="text-[#257b74]">◎</span>样本色彩：平衡处理
-          </li>
-          <li className="flex gap-2">
-            <span className="text-[#257b74]">◎</span>还原度：{fidelityLabel}模式
-          </li>
-        </ul>
-      </Card>
-      {shortVideoScript || socialCopy || customerScript ? (
-        <Card className="space-y-3 p-3">
-          <h2 className="text-[15px] font-semibold">营销内容</h2>
-          {shortVideoScript ? (
-            <p className="text-[13px] leading-6 text-neutral-700">
-              {shortVideoScript}
-            </p>
-          ) : null}
-          {socialCopy ? (
-            <p className="text-[13px] leading-6 text-neutral-700">
-              {socialCopy}
-            </p>
-          ) : null}
-          {customerScript ? (
-            <p className="text-[13px] leading-6 text-neutral-700">
-              {customerScript}
-            </p>
-          ) : null}
-        </Card>
-      ) : null}
-    </div>
-  );
-}
-
-function CustomerStep({
-  customerTab,
-  fidelity,
-  socialCopy,
-  customerScript,
-}: {
-  customerTab: CustomerTab;
-  fidelity: Fidelity;
-  socialCopy: string;
-  customerScript: string;
-}) {
-  const fidelityLabel =
-    fidelityOptions.find(([value]) => value === fidelity)?.[1] ?? "平衡";
-
-  if (customerTab === "details") {
-    return (
-      <div className="space-y-3 pt-3">
-        <Card className="p-3">
-          <h2 className="border-b border-neutral-100 pb-3 text-[16px] font-semibold">
-            方案详情
-          </h2>
-          <dl className="space-y-3 pt-3 text-[13px] leading-6 text-neutral-700">
-            <div className="rounded-lg bg-neutral-50 px-3 py-2">
-              客户：{customerName}
-            </div>
-            <div className="rounded-lg bg-neutral-50 px-3 py-2">
-              房间：{planName}
-            </div>
-            <div className="rounded-lg bg-neutral-50 px-3 py-2">
-              样本：米白高遮光绒布窗帘
-            </div>
-            <div className="rounded-lg bg-neutral-50 px-3 py-2">
-              还原度：{fidelityLabel}
-            </div>
-          </dl>
-        </Card>
-        <Card className="p-3">
-          <h2 className="mb-3 text-[15px] font-semibold">生成上下文</h2>
-          <ul className="space-y-2 text-[13px] leading-6 text-neutral-700">
-            <li>保留原房间结构、窗户位置和透视角度。</li>
-            <li>保留样本主要颜色、材质纹理和自然垂感。</li>
-            <li>避免窗户变形、窗帘位置错误和渲染不真实。</li>
-          </ul>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3 pt-3">
-      <div className="overflow-hidden rounded-[12px] border border-[#ded4c9] bg-white shadow-[0_8px_24px_rgba(31,41,55,0.06)]">
-        <RoomScene variant="customer" />
-      </div>
-
-      <CopyCard
-        title="朋友圈文案"
-        body={
-          socialCopy || (
-            <>
-            温柔米色，治愈每一天的生活气息。
-            <br />
-            轻奢质感窗帘搭配，让家更有温度与格调。
-            </>
-          )
-        }
-      />
-      <CopyCard
-        title="客户沟通话术"
-        body={
-          customerScript || (
-            <>
-            这套方案以米色为主调，搭配白色纱帘，空间更通透明亮；
-            绒布面料垂感细腻，遮光效果出色，搭配金色轨道，提升整体精致感。
-            软装色彩协调，营造出温馨舒适的居家氛围。
-            </>
-          )
-        }
-      />
-
-      <div className="grid grid-cols-3 gap-2 rounded-xl border border-neutral-100 bg-white p-2 text-[12px] text-neutral-700">
-        <button type="button" className="py-2">
-          ↗
-          <span className="ml-1">分享方案</span>
-        </button>
-        <button type="button" className="py-2">
-          ↓
-          <span className="ml-1">保存图片</span>
-        </button>
-        <button type="button" className="py-2">
-          ▣
-          <span className="ml-1">生成海报</span>
-        </button>
-      </div>
-
-      <BottomActions>
-        <button
-          type="button"
-          className="primary-action col-span-2"
-          aria-label="分享给客户"
-        >
-          <span aria-hidden="true">☏ </span>
-          分享给客户
-        </button>
-      </BottomActions>
-    </div>
-  );
-}
-
-function CopyCard({
-  title,
-  body,
-}: {
-  title: string;
-  body: React.ReactNode;
-}) {
-  return (
-    <Card className="p-3">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[15px] font-semibold">{title}</h2>
-        <button type="button" className="text-[12px] text-neutral-500">
-          ▧ 复制
-        </button>
-      </div>
-      <p className="text-[13px] leading-6 text-neutral-700">{body}</p>
-    </Card>
-  );
-}
-
-function BottomActions({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2 border-t border-neutral-100 bg-white/96 px-4 pb-4 pt-3 shadow-[0_-8px_24px_rgba(31,41,55,0.06)] backdrop-blur">
-      {children}
-    </div>
-  );
-}
-
-function RoomScene({
-  variant,
-}: {
-  variant: "empty" | "preview" | "result" | "customer";
-}) {
-  const isEmpty = variant === "empty";
-  const isTall = variant === "result";
-  const isCustomer = variant === "customer";
-
-  return (
-    <div
-      className={`room-scene room-scene-${variant} ${
-        isEmpty ? "room-scene-empty" : ""
-      } ${
-        isTall ? "aspect-[4/5]" : isCustomer ? "aspect-[16/11]" : "aspect-[16/10]"
-      }`}
-    >
-      <div className="room-ceiling" />
-      <div className="room-window">
-        {!isEmpty ? (
-          <>
-            <div className="curtain curtain-left" />
-            <div className="curtain curtain-right" />
-            <div className="sheer" />
-          </>
-        ) : null}
-        <div className="window-pane" />
-      </div>
-      {!isEmpty ? (
-        <>
-          <div className="rug" />
-          <div className="console" />
-          <div className="plant" />
-          <div className="sofa" />
-          <div className="table" />
-          <div className="vase" />
-          <div className="lamp" />
-          <div className="art" />
-        </>
-      ) : null}
-      <div className="floor" />
+      </motion.section>
     </div>
   );
 }
