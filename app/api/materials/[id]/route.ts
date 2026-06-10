@@ -9,10 +9,17 @@ export async function PATCH(
 ) {
   const session = await requireMerchantSession();
   const { id } = await params;
-  const input = materialSchema.partial().parse(await request.json());
+  const parsed = materialSchema.partial().safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "素材信息不完整", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
   const material = await db.material.update({
     where: { id, merchantId: session.merchantId },
-    data: input,
+    data: parsed.data,
   });
 
   return NextResponse.json({ material });

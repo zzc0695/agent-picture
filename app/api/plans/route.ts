@@ -16,7 +16,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
-  const input = planSchema.parse(await request.json());
+  const parsed = planSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "客户方案信息不完整", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const input = parsed.data;
   const plan = await db.customerPlan.create({
     data: {
       merchantId: session.merchantId,

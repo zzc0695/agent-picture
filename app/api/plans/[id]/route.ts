@@ -27,7 +27,15 @@ export async function PATCH(
 ) {
   const session = await requireMerchantSession();
   const { id } = await params;
-  const input = planSchema.partial().parse(await request.json());
+  const parsed = planSchema.partial().safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "客户方案信息不完整", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const input = parsed.data;
   const planInput = { ...input };
   delete planInput.materialIds;
   const plan = await db.customerPlan.update({
