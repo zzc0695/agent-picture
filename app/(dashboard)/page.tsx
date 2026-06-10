@@ -3,6 +3,8 @@
 import { useState } from "react";
 
 const steps = ["房间图", "样本", "要求", "出图"];
+const customerName = "王女士";
+const planName = "客厅窗帘方案";
 
 const roomPrompt =
   "现代轻奢风格客厅，窗帘采用米色绒布拼接白纱帘，落地款，搭配金色金属轨道。沙发选用浅灰色，搭配米色与墨绿色靠垫，地毯为浅灰色。整体色调温暖明亮，空间通透，细节精致，营造优雅舒适的氛围。";
@@ -30,11 +32,11 @@ const demoSampleImageUrl = "/demo/curtain-sample.jpg";
 const materialSummary = "米白高遮光绒布窗帘，垂感好，搭配白纱帘和金色轨道";
 
 const samples = [
-  "curtain-swatch-a",
-  "curtain-swatch-b",
-  "curtain-swatch-c",
-  "curtain-swatch-d",
-];
+  ["curtain-swatch-a", "米色布料"],
+  ["curtain-swatch-b", "白纱帘"],
+  ["curtain-swatch-c", "绑带样本"],
+  ["curtain-swatch-d", "金色轨道"],
+] as const;
 
 const fidelityOptions = [
   ["strict", "严格还原", "最大程度还原样本与房间"],
@@ -191,7 +193,6 @@ export default function WorkbenchPage() {
             {activeStep === 2 ? (
               <ResultStep
                 fidelity={fidelity}
-                imageUrl={imageUrl}
                 shortVideoScript={shortVideoScript}
                 socialCopy={socialCopy}
                 customerScript={customerScript}
@@ -233,12 +234,19 @@ export default function WorkbenchPage() {
 
 function StatusBar() {
   return (
-    <div className="flex h-9 shrink-0 items-end justify-between px-7 pb-1 text-[13px] font-semibold text-neutral-950">
+    <div className="flex h-9 shrink-0 items-end justify-between bg-white px-7 pb-1 text-[13px] font-semibold text-neutral-950">
       <span>10:32</span>
-      <div className="flex items-center gap-1.5 text-[11px]">
-        <span>▮▮▮</span>
-        <span>WiFi</span>
-        <span className="inline-flex h-2.5 w-5 rounded-sm border border-neutral-900 p-0.5">
+      <div className="flex items-center gap-1.5">
+        <span className="flex h-3.5 items-end gap-0.5" aria-hidden="true">
+          <span className="h-1.5 w-1 rounded-sm bg-neutral-950" />
+          <span className="h-2 w-1 rounded-sm bg-neutral-950" />
+          <span className="h-2.5 w-1 rounded-sm bg-neutral-950" />
+          <span className="h-3 w-1 rounded-sm bg-neutral-950" />
+        </span>
+        <span className="text-[11px]" aria-hidden="true">
+          WiFi
+        </span>
+        <span className="inline-flex h-3 w-5 rounded-[3px] border border-neutral-900 p-0.5">
           <span className="h-full w-3 rounded-[1px] bg-neutral-900" />
         </span>
       </div>
@@ -276,14 +284,20 @@ function Header({
           </h1>
           {activeStep === 0 ? (
             <p className="mt-1 truncate text-[13px] text-neutral-500">
-              王女士 · 客厅窗帘方案
+              {customerName} · {planName}
               <span aria-hidden="true">⌄</span>
             </p>
           ) : null}
         </div>
         <div className="flex justify-end gap-2 text-[13px] text-neutral-600">
           {activeStep === 1 ? (
-            <button type="button" className="font-medium text-neutral-700">
+            <button
+              type="button"
+              className="flex items-center gap-1 font-medium text-neutral-700"
+            >
+              <span className="grid size-4 place-items-center rounded border border-[#2b8178] text-[10px] text-[#1f6f68]">
+                ▣
+              </span>
               模板
             </button>
           ) : null}
@@ -373,7 +387,7 @@ function Card({
 }) {
   return (
     <section
-      className={`rounded-xl border border-neutral-100 bg-white shadow-[0_8px_28px_rgba(31,41,55,0.06)] ${className}`}
+      className={`rounded-[10px] border border-neutral-100 bg-white shadow-[0_8px_24px_rgba(31,41,55,0.045)] ${className}`}
     >
       {children}
     </section>
@@ -390,7 +404,12 @@ function RoomStep({ onNext }: { onNext: () => void }) {
             ▧ 示例
           </button>
         </div>
-        <RoomScene variant="empty" />
+        <div className="relative">
+          <RoomScene variant="empty" />
+          <span className="absolute bottom-3 left-3 rounded-md bg-black/42 px-2 py-1 text-[12px] text-white">
+            1/1
+          </span>
+        </div>
         <div className="mt-3 grid grid-cols-2 divide-x divide-neutral-100 text-center text-[13px] text-neutral-700">
           <button type="button" className="py-1.5">
             ⭱ 重新上传
@@ -407,11 +426,11 @@ function RoomStep({ onNext }: { onNext: () => void }) {
           <span className="text-[12px] text-neutral-500">4/6</span>
         </div>
         <div className="grid grid-cols-5 gap-2">
-          {samples.map((sample, index) => (
+          {samples.map(([sample, label]) => (
             <button
               key={sample}
               type="button"
-              aria-label={`样本 ${index + 1}`}
+              aria-label={label}
               className={`aspect-square rounded-lg border border-neutral-100 ${sample}`}
             />
           ))}
@@ -429,12 +448,12 @@ function RoomStep({ onNext }: { onNext: () => void }) {
         <h2 className="mb-3 text-[15px] font-semibold">待生成效果</h2>
         <div className="relative overflow-hidden rounded-lg">
           <RoomScene variant="preview" />
-          <div className="absolute inset-0 grid place-items-center bg-black/18 text-center text-[13px] font-medium leading-6 text-white">
+          <div className="absolute inset-0 grid place-items-center bg-black/22 text-center text-[13px] font-medium leading-6 text-white">
             生成后将在此处显示效果图
             <br />
             支持多次生成对比
           </div>
-          <span className="absolute left-3 top-3 grid size-8 place-items-center rounded-full bg-white/86 text-lg text-neutral-700">
+          <span className="absolute left-1/2 top-5 grid size-8 -translate-x-1/2 place-items-center rounded-full bg-white/88 text-lg text-neutral-700 shadow-sm">
             ↓
           </span>
         </div>
@@ -669,7 +688,6 @@ function PromptLibrarySheet({
 
 function ResultStep({
   fidelity,
-  imageUrl,
   shortVideoScript,
   socialCopy,
   customerScript,
@@ -679,7 +697,6 @@ function ResultStep({
   onCustomerView,
 }: {
   fidelity: Fidelity;
-  imageUrl: string;
   shortVideoScript: string;
   socialCopy: string;
   customerScript: string;
@@ -693,7 +710,7 @@ function ResultStep({
 
   return (
     <div className="space-y-3 pt-3">
-      <div className="relative overflow-hidden rounded-xl">
+      <div className="relative overflow-hidden rounded-[12px] border border-[#ddd2c6] bg-white shadow-[0_10px_28px_rgba(31,41,55,0.08)]">
         <span className="absolute left-3 top-3 z-10 rounded-md bg-[#df7654] px-2.5 py-1.5 text-[12px] font-semibold text-white">
           最新生成
         </span>
@@ -710,11 +727,15 @@ function ResultStep({
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        {["相似方案", "营销内容", "保存方案"].map((label) => (
+        {[
+          ["相似方案", "⌂"],
+          ["营销内容", "▣"],
+          ["保存方案", "▤"],
+        ].map(([label, icon]) => (
           <button
             key={label}
             type="button"
-            className="rounded-lg border border-neutral-100 bg-white px-2 py-3 text-[13px] text-neutral-700 shadow-[0_5px_18px_rgba(31,41,55,0.04)]"
+            className="min-h-[62px] rounded-lg border border-neutral-100 bg-white px-2 py-3 text-[13px] text-neutral-700 shadow-[0_5px_18px_rgba(31,41,55,0.04)]"
             disabled={
               (label === "相似方案" && busyAction === "generate") ||
               (label === "营销内容" && busyAction === "marketing") ||
@@ -728,6 +749,12 @@ function ResultStep({
                   : onSimilar
             }
           >
+            <span
+              aria-hidden="true"
+              className="mb-1 block text-[18px] leading-none text-neutral-800"
+            >
+              {icon}
+            </span>
             {label === "营销内容" && busyAction === "marketing"
               ? "生成中"
               : label === "保存方案" && busyAction === "save"
@@ -742,10 +769,15 @@ function ResultStep({
           本次生成条件
         </h2>
         <ul className="space-y-2 pt-3 text-[13px] text-neutral-600">
-          <li>◎ 房间结构：已保留</li>
-          <li>◎ 样本色彩：平衡处理</li>
-          <li>◎ 还原度：{fidelityLabel}模式</li>
-          <li>◎ 效果图：{imageUrl || "本地预览图"}</li>
+          <li className="flex gap-2">
+            <span className="text-[#257b74]">◎</span>房间结构：已保留
+          </li>
+          <li className="flex gap-2">
+            <span className="text-[#257b74]">◎</span>样本色彩：平衡处理
+          </li>
+          <li className="flex gap-2">
+            <span className="text-[#257b74]">◎</span>还原度：{fidelityLabel}模式
+          </li>
         </ul>
       </Card>
       {shortVideoScript || socialCopy || customerScript ? (
@@ -795,10 +827,10 @@ function CustomerStep({
           </h2>
           <dl className="space-y-3 pt-3 text-[13px] leading-6 text-neutral-700">
             <div className="rounded-lg bg-neutral-50 px-3 py-2">
-              客户：王女士
+              客户：{customerName}
             </div>
             <div className="rounded-lg bg-neutral-50 px-3 py-2">
-              房间：客厅窗帘方案
+              房间：{planName}
             </div>
             <div className="rounded-lg bg-neutral-50 px-3 py-2">
               样本：米白高遮光绒布窗帘
@@ -822,7 +854,9 @@ function CustomerStep({
 
   return (
     <div className="space-y-3 pt-3">
-      <RoomScene variant="customer" />
+      <div className="overflow-hidden rounded-[12px] border border-[#ded4c9] bg-white shadow-[0_8px_24px_rgba(31,41,55,0.06)]">
+        <RoomScene variant="customer" />
+      </div>
 
       <CopyCard
         title="朋友圈文案"
@@ -851,13 +885,16 @@ function CustomerStep({
 
       <div className="grid grid-cols-3 gap-2 rounded-xl border border-neutral-100 bg-white p-2 text-[12px] text-neutral-700">
         <button type="button" className="py-2">
-          分享方案
+          ↗
+          <span className="ml-1">分享方案</span>
         </button>
         <button type="button" className="py-2">
-          保存图片
+          ↓
+          <span className="ml-1">保存图片</span>
         </button>
         <button type="button" className="py-2">
-          生成海报
+          ▣
+          <span className="ml-1">生成海报</span>
         </button>
       </div>
 
@@ -897,7 +934,7 @@ function CopyCard({
 
 function BottomActions({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2 border-t border-neutral-100 bg-white/95 px-4 pb-4 pt-3 backdrop-blur">
+    <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2 border-t border-neutral-100 bg-white/96 px-4 pb-4 pt-3 shadow-[0_-8px_24px_rgba(31,41,55,0.06)] backdrop-blur">
       {children}
     </div>
   );
@@ -910,11 +947,12 @@ function RoomScene({
 }) {
   const isEmpty = variant === "empty";
   const isTall = variant === "result";
+  const isCustomer = variant === "customer";
 
   return (
     <div
       className={`room-scene ${isEmpty ? "room-scene-empty" : ""} ${
-        isTall ? "aspect-[4/5]" : "aspect-[16/10]"
+        isTall ? "aspect-[4/5]" : isCustomer ? "aspect-[16/11]" : "aspect-[16/10]"
       }`}
     >
       <div className="room-ceiling" />

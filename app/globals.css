@@ -24,14 +24,14 @@ body {
   place-items: center;
   padding: 18px;
   background:
-    radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.82), transparent 34%),
-    linear-gradient(135deg, #f8f7f3 0%, #efece6 100%);
+    radial-gradient(circle at 18% 10%, rgba(255, 255, 255, 0.9), transparent 30%),
+    linear-gradient(135deg, #faf9f6 0%, #ece8df 100%);
 }
 
 .phone-frame {
   position: relative;
   width: min(100%, 430px);
-  height: min(92vh, 904px);
+  height: min(92vh, 884px);
   min-height: 760px;
   border: 8px solid #111;
   border-radius: 48px;
@@ -61,7 +61,7 @@ body {
   overflow: hidden;
   flex-direction: column;
   border-radius: 39px;
-  background: #f8f8f6;
+  background: #f8f7f4;
 }
 
 .secondary-action,
@@ -76,12 +76,13 @@ body {
   border: 1px solid #257b74;
   background: #fff;
   color: #1f6f68;
+  box-shadow: 0 8px 18px rgba(31, 111, 104, 0.08);
 }
 
 .primary-action {
-  background: linear-gradient(135deg, #2b8178, #176d67);
+  background: linear-gradient(135deg, #2f857d, #176d67);
   color: #fff;
-  box-shadow: 0 12px 28px rgba(38, 122, 114, 0.26);
+  box-shadow: 0 12px 28px rgba(38, 122, 114, 0.28);
 }
 
 .curtain-swatch-a {
@@ -114,8 +115,8 @@ body {
   border-radius: 11px;
   border: 1px solid #ded8d0;
   background:
-    linear-gradient(90deg, #e6e2db 0 17%, transparent 17% 83%, #e1dcd4 83%),
-    linear-gradient(180deg, #f2eee8 0 16%, #efebe5 16% 63%, #d8c9b7 63% 100%);
+    linear-gradient(90deg, #e8e4dc 0 16%, transparent 16% 84%, #e3ded5 84%),
+    linear-gradient(180deg, #f4efe8 0 15%, #efeae2 15% 63%, #d8c8b4 63% 100%);
 }
 
 .room-scene::before {
@@ -163,6 +164,8 @@ body {
   position: absolute;
   inset: 12% 20% 0;
   background:
+    linear-gradient(180deg, transparent 58%, rgba(133, 154, 160, 0.26) 58% 60%, transparent 60%),
+    linear-gradient(90deg, transparent 16%, rgba(124, 145, 151, 0.24) 16% 17%, transparent 17% 35%, rgba(124, 145, 151, 0.2) 35% 36%, transparent 36%),
     linear-gradient(90deg, transparent 48%, rgba(38, 42, 46, 0.72) 48% 52%, transparent 52%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(219, 232, 236, 0.58));
   border: 1px solid rgba(55, 60, 65, 0.42);
@@ -174,9 +177,9 @@ body {
   bottom: -4%;
   width: 28%;
   background:
-    repeating-linear-gradient(90deg, rgba(124, 97, 65, 0.24) 0 5px, transparent 5px 10px),
-    linear-gradient(90deg, #c7ad8d, #e3d0b4 55%, #a98462);
-  filter: drop-shadow(0 8px 10px rgba(92, 72, 51, 0.2));
+    repeating-linear-gradient(90deg, rgba(113, 84, 52, 0.24) 0 4px, transparent 4px 9px),
+    linear-gradient(90deg, #b99570, #ead8bd 54%, #a77d59);
+  filter: drop-shadow(0 8px 10px rgba(92, 72, 51, 0.22));
 }
 
 .curtain-left {
@@ -193,8 +196,9 @@ body {
   position: absolute;
   inset: 2% 28% -3%;
   background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0 4px, rgba(231, 225, 214, 0.3) 4px 8px),
-    rgba(255, 255, 255, 0.44);
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.5) 0 4px, rgba(231, 225, 214, 0.34) 4px 8px),
+    rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(0.5px);
 }
 
 .floor {
@@ -202,8 +206,8 @@ body {
   inset: 64% 0 0;
   background:
     linear-gradient(20deg, rgba(105, 86, 65, 0.16), transparent 50%),
-    repeating-linear-gradient(12deg, rgba(106, 89, 70, 0.08) 0 2px, transparent 2px 28px),
-    linear-gradient(90deg, #cdbba6, #e4d8c8 50%, #bba48c);
+    repeating-linear-gradient(12deg, rgba(106, 89, 70, 0.09) 0 2px, transparent 2px 28px),
+    linear-gradient(90deg, #c9b79f, #e6d9c8 50%, #b99f84);
 }
 
 .sofa {
