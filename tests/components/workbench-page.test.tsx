@@ -120,6 +120,30 @@ describe("WorkbenchPage", () => {
       expect.objectContaining({ method: "POST" }),
     );
   });
+
+  it("opens the prompt library as a bottom sheet and can replace the prompt", async () => {
+    const user = userEvent.setup();
+    mockApiResponses();
+
+    render(<WorkbenchPage />);
+
+    await user.click(screen.getByRole("button", { name: "下一步：生成要求" }));
+    await user.click(screen.getByRole("button", { name: /从提示词库选择/ }));
+
+    expect(screen.getByRole("dialog", { name: "提示词库" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "客厅现代简约窗帘" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "替换整段" }));
+
+    expect(screen.getByLabelText("生成要求")).toHaveValue(
+      "保留客厅原有结构、窗户位置和透视角度，为窗户安装现代简约风格窗帘，强调自然垂感、真实布料纹理、柔和室内光线，整体干净高级。",
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "提示词库" }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("ResultPanel", () => {

@@ -8,6 +8,23 @@ const roomPrompt =
   "现代轻奢风格客厅，窗帘采用米色绒布拼接白纱帘，落地款，搭配金色金属轨道。沙发选用浅灰色，搭配米色与墨绿色靠垫，地毯为浅灰色。整体色调温暖明亮，空间通透，细节精致，营造优雅舒适的氛围。";
 
 const promptTags = ["现代简约", "高透光", "米白色", "保留窗户结构"];
+const promptTemplates = [
+  {
+    title: "客厅现代简约窗帘",
+    category: "房间风格",
+    body: "保留客厅原有结构、窗户位置和透视角度，为窗户安装现代简约风格窗帘，强调自然垂感、真实布料纹理、柔和室内光线，整体干净高级。",
+  },
+  {
+    title: "高遮光温馨卧室",
+    category: "窗帘卖点",
+    body: "保留卧室原始布局和窗户位置，搭配高遮光米白窗帘，突出厚实面料、柔和褶皱、安静舒适的睡眠氛围，画面保持真实摄影质感。",
+  },
+  {
+    title: "轻奢客户沟通方案",
+    category: "营销用途",
+    body: "保持房间透视和光线方向，为窗户搭配轻奢质感窗帘，突出垂感、色彩协调和空间升级效果，适合给客户展示成交前方案。",
+  },
+];
 const demoRoomImageUrl = "/demo/room-before.jpg";
 const demoSampleImageUrl = "/demo/curtain-sample.jpg";
 const materialSummary = "米白高遮光绒布窗帘，垂感好，搭配白纱帘和金色轨道";
@@ -39,6 +56,7 @@ export default function WorkbenchPage() {
   const [socialCopy, setSocialCopy] = useState("");
   const [customerScript, setCustomerScript] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
 
   async function postJson<T>(url: string, body: unknown): Promise<T> {
     const response = await fetch(url, {
@@ -157,6 +175,7 @@ export default function WorkbenchPage() {
                 onPromptChange={setPrompt}
                 onFidelityChange={setFidelity}
                 busyAction={busyAction}
+                onOpenPromptLibrary={() => setPromptLibraryOpen(true)}
                 onOptimize={optimizePrompt}
                 onGenerate={() => generateImage()}
               />
@@ -178,6 +197,21 @@ export default function WorkbenchPage() {
               <CustomerStep socialCopy={socialCopy} customerScript={customerScript} />
             ) : null}
           </main>
+          {promptLibraryOpen ? (
+            <PromptLibrarySheet
+              onClose={() => setPromptLibraryOpen(false)}
+              onInsert={(body) => {
+                setPrompt((current) => `${current}${current ? "\n" : ""}${body}`);
+                setPromptLibraryOpen(false);
+              }}
+              onReplace={(body) => {
+                setPrompt(body);
+                setOptimizedPrompt("");
+                setNegativePrompt("");
+                setPromptLibraryOpen(false);
+              }}
+            />
+          ) : null}
         </div>
       </div>
     </div>
@@ -390,6 +424,7 @@ function RequirementStep({
   onPromptChange,
   onFidelityChange,
   busyAction,
+  onOpenPromptLibrary,
   onOptimize,
   onGenerate,
 }: {
@@ -398,6 +433,7 @@ function RequirementStep({
   onPromptChange: (value: string) => void;
   onFidelityChange: (value: Fidelity) => void;
   busyAction: string | null;
+  onOpenPromptLibrary: () => void;
   onOptimize: () => void;
   onGenerate: () => void;
 }) {
@@ -418,6 +454,7 @@ function RequirementStep({
         <button
           type="button"
           className="mt-2 flex w-full items-center justify-between text-[13px] text-neutral-600"
+          onClick={onOpenPromptLibrary}
         >
           <span>从提示词库选择</span>
           <span>⌄</span>
@@ -494,6 +531,103 @@ function RequirementStep({
           {busyAction === "generate" ? "生成中" : "生成效果图"}
         </button>
       </BottomActions>
+    </div>
+  );
+}
+
+function PromptLibrarySheet({
+  onClose,
+  onInsert,
+  onReplace,
+}: {
+  onClose: () => void;
+  onInsert: (body: string) => void;
+  onReplace: (body: string) => void;
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const selected = promptTemplates[selectedIndex];
+
+  return (
+    <div className="absolute inset-0 z-30 flex items-end bg-black/32">
+      <section
+        aria-modal="true"
+        aria-label="提示词库"
+        role="dialog"
+        className="max-h-[78%] w-full overflow-hidden rounded-t-3xl bg-white shadow-[0_-18px_42px_rgba(31,41,55,0.18)]"
+      >
+        <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-neutral-200" />
+        <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+          <div>
+            <h2 className="text-[17px] font-semibold text-neutral-950">
+              提示词库
+            </h2>
+            <p className="mt-0.5 text-[12px] text-neutral-500">
+              先预览，再插入或替换当前内容
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="关闭提示词库"
+            className="grid size-8 place-items-center rounded-full bg-neutral-100 text-lg text-neutral-600"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="grid max-h-[calc(78vh-132px)] grid-cols-[128px_1fr] overflow-hidden">
+          <div className="space-y-2 overflow-y-auto border-r border-neutral-100 bg-[#f8f8f6] p-3">
+            {promptTemplates.map((template, index) => (
+              <button
+                key={template.title}
+                type="button"
+                className={`w-full rounded-xl border px-3 py-3 text-left ${
+                  selectedIndex === index
+                    ? "border-[#257b74] bg-white text-[#1f6f68] shadow-sm"
+                    : "border-transparent bg-transparent text-neutral-700"
+                }`}
+                onClick={() => setSelectedIndex(index)}
+              >
+                <span className="block text-[13px] font-semibold leading-5">
+                  {template.title}
+                </span>
+                <span className="mt-1 block text-[11px] text-neutral-400">
+                  {template.category}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="overflow-y-auto p-4">
+            <span className="rounded-md bg-[#eef8f6] px-2 py-1 text-[11px] font-medium text-[#1f6f68]">
+              {selected.category}
+            </span>
+            <h3 className="mt-3 text-[16px] font-semibold text-neutral-950">
+              {selected.title}
+            </h3>
+            <p className="mt-3 rounded-xl border border-neutral-100 bg-neutral-50 p-3 text-[13px] leading-6 text-neutral-700">
+              {selected.body}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-neutral-100 bg-white px-4 pb-4 pt-3">
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => onInsert(selected.body)}
+          >
+            插入到当前
+          </button>
+          <button
+            type="button"
+            className="primary-action"
+            onClick={() => onReplace(selected.body)}
+          >
+            替换整段
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
