@@ -44,6 +44,7 @@ const fidelityOptions = [
 
 type FlowStep = 0 | 1 | 2 | 3;
 type Fidelity = (typeof fidelityOptions)[number][0];
+type CustomerTab = "effect" | "details";
 
 export default function WorkbenchPage() {
   const [activeStep, setActiveStep] = useState<FlowStep>(0);
@@ -57,6 +58,7 @@ export default function WorkbenchPage() {
   const [customerScript, setCustomerScript] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
+  const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
 
   async function postJson<T>(url: string, body: unknown): Promise<T> {
     const response = await fetch(url, {
@@ -152,6 +154,7 @@ export default function WorkbenchPage() {
         status: "ready",
         materialIds: [],
       });
+      setCustomerTab("effect");
       setActiveStep(3);
     } finally {
       setBusyAction(null);
@@ -163,7 +166,12 @@ export default function WorkbenchPage() {
       <div className="phone-frame">
         <div className="phone-screen">
           <StatusBar />
-          <Header activeStep={activeStep} onStepChange={setActiveStep} />
+          <Header
+            activeStep={activeStep}
+            customerTab={customerTab}
+            onCustomerTabChange={setCustomerTab}
+            onStepChange={setActiveStep}
+          />
           <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-24">
             {activeStep === 0 ? (
               <RoomStep onNext={() => setActiveStep(1)} />
@@ -194,7 +202,12 @@ export default function WorkbenchPage() {
               />
             ) : null}
             {activeStep === 3 ? (
-              <CustomerStep socialCopy={socialCopy} customerScript={customerScript} />
+              <CustomerStep
+                customerTab={customerTab}
+                fidelity={fidelity}
+                socialCopy={socialCopy}
+                customerScript={customerScript}
+              />
             ) : null}
           </main>
           {promptLibraryOpen ? (
@@ -235,9 +248,13 @@ function StatusBar() {
 
 function Header({
   activeStep,
+  customerTab,
+  onCustomerTabChange,
   onStepChange,
 }: {
   activeStep: FlowStep;
+  customerTab: CustomerTab;
+  onCustomerTabChange: (tab: CustomerTab) => void;
   onStepChange: (step: FlowStep) => void;
 }) {
   const titles = ["新建客户方案", "生成要求", "生成结果", "客户展示"];
@@ -319,10 +336,28 @@ function Header({
 
       {activeStep === 3 ? (
         <div className="mt-2 grid grid-cols-2 border-b border-neutral-100 text-center text-[14px] font-medium">
-          <span className="border-b-2 border-[#257b74] pb-3 text-neutral-950">
+          <button
+            type="button"
+            className={`border-b-2 pb-3 ${
+              customerTab === "effect"
+                ? "border-[#257b74] text-neutral-950"
+                : "border-transparent text-neutral-500"
+            }`}
+            onClick={() => onCustomerTabChange("effect")}
+          >
             方案效果
-          </span>
-          <span className="pb-3 text-neutral-500">方案详情</span>
+          </button>
+          <button
+            type="button"
+            className={`border-b-2 pb-3 ${
+              customerTab === "details"
+                ? "border-[#257b74] text-neutral-950"
+                : "border-transparent text-neutral-500"
+            }`}
+            onClick={() => onCustomerTabChange("details")}
+          >
+            方案详情
+          </button>
         </div>
       ) : null}
     </header>
@@ -738,12 +773,53 @@ function ResultStep({
 }
 
 function CustomerStep({
+  customerTab,
+  fidelity,
   socialCopy,
   customerScript,
 }: {
+  customerTab: CustomerTab;
+  fidelity: Fidelity;
   socialCopy: string;
   customerScript: string;
 }) {
+  const fidelityLabel =
+    fidelityOptions.find(([value]) => value === fidelity)?.[1] ?? "平衡";
+
+  if (customerTab === "details") {
+    return (
+      <div className="space-y-3 pt-3">
+        <Card className="p-3">
+          <h2 className="border-b border-neutral-100 pb-3 text-[16px] font-semibold">
+            方案详情
+          </h2>
+          <dl className="space-y-3 pt-3 text-[13px] leading-6 text-neutral-700">
+            <div className="rounded-lg bg-neutral-50 px-3 py-2">
+              客户：王女士
+            </div>
+            <div className="rounded-lg bg-neutral-50 px-3 py-2">
+              房间：客厅窗帘方案
+            </div>
+            <div className="rounded-lg bg-neutral-50 px-3 py-2">
+              样本：米白高遮光绒布窗帘
+            </div>
+            <div className="rounded-lg bg-neutral-50 px-3 py-2">
+              还原度：{fidelityLabel}
+            </div>
+          </dl>
+        </Card>
+        <Card className="p-3">
+          <h2 className="mb-3 text-[15px] font-semibold">生成上下文</h2>
+          <ul className="space-y-2 text-[13px] leading-6 text-neutral-700">
+            <li>保留原房间结构、窗户位置和透视角度。</li>
+            <li>保留样本主要颜色、材质纹理和自然垂感。</li>
+            <li>避免窗户变形、窗帘位置错误和渲染不真实。</li>
+          </ul>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 pt-3">
       <RoomScene variant="customer" />

@@ -144,6 +144,30 @@ describe("WorkbenchPage", () => {
       screen.queryByRole("dialog", { name: "提示词库" }),
     ).not.toBeInTheDocument();
   });
+
+  it("switches between customer effect and detail tabs", async () => {
+    const user = userEvent.setup();
+    mockApiResponses();
+
+    render(<WorkbenchPage />);
+
+    await user.click(screen.getByRole("button", { name: "下一步：生成要求" }));
+    await user.click(screen.getByRole("button", { name: "生成效果图" }));
+    await user.click(await screen.findByRole("button", { name: "保存方案" }));
+
+    expect(await screen.findByRole("heading", { name: "客户展示" })).toBeInTheDocument();
+    expect(screen.getByText("朋友圈文案")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "方案详情" }));
+
+    expect(screen.getByRole("heading", { name: "方案详情" })).toBeInTheDocument();
+    expect(screen.getByText("客户：王女士")).toBeInTheDocument();
+    expect(screen.getByText("还原度：平衡")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "方案效果" }));
+
+    expect(screen.getByText("朋友圈文案")).toBeInTheDocument();
+  });
 });
 
 describe("ResultPanel", () => {
