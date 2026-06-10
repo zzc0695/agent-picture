@@ -15,9 +15,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
-  const input = promptTemplateSchema.parse(await request.json());
+  const parsed = promptTemplateSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "提示词模板信息不完整", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
   const template = await db.promptTemplate.create({
-    data: { ...input, merchantId: session.merchantId, isSystem: false },
+    data: { ...parsed.data, merchantId: session.merchantId, isSystem: false },
   });
 
   return NextResponse.json({ template }, { status: 201 });
