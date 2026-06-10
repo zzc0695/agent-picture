@@ -85,6 +85,11 @@ describe("plans API", () => {
         optimizedPrompt: "",
         negativePrompt: "",
         fidelity: "balanced",
+        primaryImageUrl: "/uploads/generated-effect.png",
+        shortVideoScript: "短视频脚本内容",
+        socialCopy: "朋友圈文案内容",
+        customerScript: "客户沟通话术内容",
+        status: "ready",
         materialIds: ["material_1"],
       }),
     );
@@ -94,6 +99,11 @@ describe("plans API", () => {
       data: expect.objectContaining({
         merchantId: "merchant_1",
         customerName: "王女士",
+        primaryImageUrl: "/uploads/generated-effect.png",
+        shortVideoScript: "短视频脚本内容",
+        socialCopy: "朋友圈文案内容",
+        customerScript: "客户沟通话术内容",
+        status: "ready",
         materials: {
           create: [{ materialId: "material_1" }],
         },

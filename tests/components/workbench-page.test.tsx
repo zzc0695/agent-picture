@@ -1,12 +1,57 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import WorkbenchPage from "@/app/(dashboard)/page";
 import { ResultPanel } from "@/components/result-panel";
 
+function mockApiResponses() {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url.endsWith("/api/ai/optimize-prompt")) {
+      return Response.json({
+        optimizedPrompt: "优化后的窗帘效果图提示词",
+        negativePrompt: "避免窗户变形",
+      });
+    }
+
+    if (url.endsWith("/api/ai/generate-image")) {
+      return Response.json({
+        imageUrl: "/uploads/generated-effect.png",
+        inputSummary: "balanced: 优化后的窗帘效果图提示词",
+      });
+    }
+
+    if (url.endsWith("/api/ai/generate-marketing")) {
+      return Response.json({
+        shortVideoScript: "短视频脚本内容",
+        socialCopy: "接口返回的朋友圈文案",
+        customerScript: "接口返回的客户沟通话术",
+      });
+    }
+
+    if (url.endsWith("/api/plans")) {
+      return Response.json(
+        { plan: { id: "plan_1", customerName: "王女士" } },
+        { status: 201 },
+      );
+    }
+
+    return Response.json({}, { status: 404 });
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 describe("WorkbenchPage", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders the mobile proposal flow from the design reference", async () => {
     const user = userEvent.setup();
+    mockApiResponses();
 
     render(<WorkbenchPage />);
 
@@ -36,6 +81,44 @@ describe("WorkbenchPage", () => {
     expect(
       screen.getByRole("button", { name: "分享给客户" }),
     ).toBeInTheDocument();
+  });
+
+  it("uses backend APIs for optimization, generation, marketing, and saving", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockApiResponses();
+
+    render(<WorkbenchPage />);
+
+    await user.click(screen.getByRole("button", { name: "下一步：生成要求" }));
+    await user.click(screen.getByRole("button", { name: "优化提示词" }));
+    expect(await screen.findByDisplayValue("优化后的窗帘效果图提示词")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "生成效果图" }));
+    expect(await screen.findByRole("heading", { name: "生成结果" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "营销内容" }));
+    expect(await screen.findByText("接口返回的朋友圈文案")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "保存方案" }));
+    expect(await screen.findByRole("heading", { name: "客户展示" })).toBeInTheDocument();
+    expect(screen.getByText("接口返回的客户沟通话术")).toBeInTheDocument();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/ai/optimize-prompt",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/ai/generate-image",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/ai/generate-marketing",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/plans",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 });
 

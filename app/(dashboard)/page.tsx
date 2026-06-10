@@ -8,6 +8,9 @@ const roomPrompt =
   "现代轻奢风格客厅，窗帘采用米色绒布拼接白纱帘，落地款，搭配金色金属轨道。沙发选用浅灰色，搭配米色与墨绿色靠垫，地毯为浅灰色。整体色调温暖明亮，空间通透，细节精致，营造优雅舒适的氛围。";
 
 const promptTags = ["现代简约", "高透光", "米白色", "保留窗户结构"];
+const demoRoomImageUrl = "/demo/room-before.jpg";
+const demoSampleImageUrl = "/demo/curtain-sample.jpg";
+const materialSummary = "米白高遮光绒布窗帘，垂感好，搭配白纱帘和金色轨道";
 
 const samples = [
   "curtain-swatch-a",
@@ -28,7 +31,114 @@ type Fidelity = (typeof fidelityOptions)[number][0];
 export default function WorkbenchPage() {
   const [activeStep, setActiveStep] = useState<FlowStep>(0);
   const [prompt, setPrompt] = useState(roomPrompt);
+  const [optimizedPrompt, setOptimizedPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
   const [fidelity, setFidelity] = useState<Fidelity>("balanced");
+  const [imageUrl, setImageUrl] = useState("");
+  const [shortVideoScript, setShortVideoScript] = useState("");
+  const [socialCopy, setSocialCopy] = useState("");
+  const [customerScript, setCustomerScript] = useState("");
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+
+  async function postJson<T>(url: string, body: unknown): Promise<T> {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed: ${url}`);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  async function optimizePrompt() {
+    setBusyAction("optimize");
+    try {
+      const result = await postJson<{
+        optimizedPrompt: string;
+        negativePrompt: string;
+      }>("/api/ai/optimize-prompt", {
+        userPrompt: prompt,
+        materialSummary,
+        fidelity,
+      });
+      setPrompt(result.optimizedPrompt);
+      setOptimizedPrompt(result.optimizedPrompt);
+      setNegativePrompt(result.negativePrompt);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function generateImage(referenceImageUrl?: string) {
+    setBusyAction("generate");
+    try {
+      const result = await postJson<{ imageUrl: string; inputSummary: string }>(
+        "/api/ai/generate-image",
+        {
+          roomImageUrl: demoRoomImageUrl,
+          sampleImageUrl: demoSampleImageUrl,
+          optimizedPrompt: optimizedPrompt || prompt,
+          negativePrompt,
+          fidelity,
+          referenceImageUrl,
+        },
+      );
+      setImageUrl(result.imageUrl);
+      setActiveStep(2);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function generateMarketing() {
+    setBusyAction("marketing");
+    try {
+      const result = await postJson<{
+        shortVideoScript: string;
+        socialCopy: string;
+        customerScript: string;
+      }>("/api/ai/generate-marketing", {
+        materialSummary,
+        roomSummary: optimizedPrompt || prompt,
+        effectImageUrl: imageUrl || demoRoomImageUrl,
+        customerNotes: "王女士客厅窗帘方案",
+      });
+      setShortVideoScript(result.shortVideoScript);
+      setSocialCopy(result.socialCopy);
+      setCustomerScript(result.customerScript);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function savePlan() {
+    setBusyAction("save");
+    try {
+      await postJson("/api/plans", {
+        customerName: "王女士",
+        notes: "客厅窗帘方案",
+        roomImageUrl: demoRoomImageUrl,
+        sampleImageUrl: demoSampleImageUrl,
+        originalPrompt: roomPrompt,
+        optimizedPrompt: optimizedPrompt || prompt,
+        negativePrompt,
+        fidelity,
+        primaryImageUrl: imageUrl || demoRoomImageUrl,
+        shortVideoScript,
+        socialCopy,
+        customerScript,
+        status: "ready",
+        materialIds: [],
+      });
+      setActiveStep(3);
+    } finally {
+      setBusyAction(null);
+    }
+  }
 
   return (
     <div className="proposal-stage">
@@ -46,16 +156,27 @@ export default function WorkbenchPage() {
                 fidelity={fidelity}
                 onPromptChange={setPrompt}
                 onFidelityChange={setFidelity}
-                onGenerate={() => setActiveStep(2)}
+                busyAction={busyAction}
+                onOptimize={optimizePrompt}
+                onGenerate={() => generateImage()}
               />
             ) : null}
             {activeStep === 2 ? (
               <ResultStep
                 fidelity={fidelity}
-                onCustomerView={() => setActiveStep(3)}
+                imageUrl={imageUrl}
+                shortVideoScript={shortVideoScript}
+                socialCopy={socialCopy}
+                customerScript={customerScript}
+                busyAction={busyAction}
+                onSimilar={() => generateImage(imageUrl)}
+                onMarketing={generateMarketing}
+                onCustomerView={savePlan}
               />
             ) : null}
-            {activeStep === 3 ? <CustomerStep /> : null}
+            {activeStep === 3 ? (
+              <CustomerStep socialCopy={socialCopy} customerScript={customerScript} />
+            ) : null}
           </main>
         </div>
       </div>
@@ -268,12 +389,16 @@ function RequirementStep({
   fidelity,
   onPromptChange,
   onFidelityChange,
+  busyAction,
+  onOptimize,
   onGenerate,
 }: {
   prompt: string;
   fidelity: Fidelity;
   onPromptChange: (value: string) => void;
   onFidelityChange: (value: Fidelity) => void;
+  busyAction: string | null;
+  onOptimize: () => void;
   onGenerate: () => void;
 }) {
   return (
@@ -348,18 +473,25 @@ function RequirementStep({
       </Card>
 
       <BottomActions>
-        <button type="button" className="secondary-action" aria-label="优化提示词">
+        <button
+          type="button"
+          className="secondary-action"
+          aria-label="优化提示词"
+          disabled={busyAction === "optimize"}
+          onClick={onOptimize}
+        >
           <span aria-hidden="true">✧ </span>
-          优化提示词
+          {busyAction === "optimize" ? "优化中" : "优化提示词"}
         </button>
         <button
           type="button"
           className="primary-action"
           aria-label="生成效果图"
+          disabled={busyAction === "generate"}
           onClick={onGenerate}
         >
           <span aria-hidden="true">✦ </span>
-          生成效果图
+          {busyAction === "generate" ? "生成中" : "生成效果图"}
         </button>
       </BottomActions>
     </div>
@@ -368,9 +500,23 @@ function RequirementStep({
 
 function ResultStep({
   fidelity,
+  imageUrl,
+  shortVideoScript,
+  socialCopy,
+  customerScript,
+  busyAction,
+  onSimilar,
+  onMarketing,
   onCustomerView,
 }: {
   fidelity: Fidelity;
+  imageUrl: string;
+  shortVideoScript: string;
+  socialCopy: string;
+  customerScript: string;
+  busyAction: string | null;
+  onSimilar: () => void;
+  onMarketing: () => void;
   onCustomerView: () => void;
 }) {
   const fidelityLabel =
@@ -400,9 +546,24 @@ function ResultStep({
             key={label}
             type="button"
             className="rounded-lg border border-neutral-100 bg-white px-2 py-3 text-[13px] text-neutral-700 shadow-[0_5px_18px_rgba(31,41,55,0.04)]"
-            onClick={label === "保存方案" ? onCustomerView : undefined}
+            disabled={
+              (label === "相似方案" && busyAction === "generate") ||
+              (label === "营销内容" && busyAction === "marketing") ||
+              (label === "保存方案" && busyAction === "save")
+            }
+            onClick={
+              label === "保存方案"
+                ? onCustomerView
+                : label === "营销内容"
+                  ? onMarketing
+                  : onSimilar
+            }
           >
-            {label}
+            {label === "营销内容" && busyAction === "marketing"
+              ? "生成中"
+              : label === "保存方案" && busyAction === "save"
+                ? "保存中"
+                : label}
           </button>
         ))}
       </div>
@@ -415,13 +576,40 @@ function ResultStep({
           <li>◎ 房间结构：已保留</li>
           <li>◎ 样本色彩：平衡处理</li>
           <li>◎ 还原度：{fidelityLabel}模式</li>
+          <li>◎ 效果图：{imageUrl || "本地预览图"}</li>
         </ul>
       </Card>
+      {shortVideoScript || socialCopy || customerScript ? (
+        <Card className="space-y-3 p-3">
+          <h2 className="text-[15px] font-semibold">营销内容</h2>
+          {shortVideoScript ? (
+            <p className="text-[13px] leading-6 text-neutral-700">
+              {shortVideoScript}
+            </p>
+          ) : null}
+          {socialCopy ? (
+            <p className="text-[13px] leading-6 text-neutral-700">
+              {socialCopy}
+            </p>
+          ) : null}
+          {customerScript ? (
+            <p className="text-[13px] leading-6 text-neutral-700">
+              {customerScript}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
     </div>
   );
 }
 
-function CustomerStep() {
+function CustomerStep({
+  socialCopy,
+  customerScript,
+}: {
+  socialCopy: string;
+  customerScript: string;
+}) {
   return (
     <div className="space-y-3 pt-3">
       <RoomScene variant="customer" />
@@ -429,21 +617,25 @@ function CustomerStep() {
       <CopyCard
         title="朋友圈文案"
         body={
-          <>
+          socialCopy || (
+            <>
             温柔米色，治愈每一天的生活气息。
             <br />
             轻奢质感窗帘搭配，让家更有温度与格调。
-          </>
+            </>
+          )
         }
       />
       <CopyCard
         title="客户沟通话术"
         body={
-          <>
+          customerScript || (
+            <>
             这套方案以米色为主调，搭配白色纱帘，空间更通透明亮；
             绒布面料垂感细腻，遮光效果出色，搭配金色轨道，提升整体精致感。
             软装色彩协调，营造出温馨舒适的居家氛围。
-          </>
+            </>
+          )
         }
       />
 

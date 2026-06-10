@@ -36,6 +36,11 @@ export async function POST(request: Request) {
       optimizedPrompt: input.optimizedPrompt,
       negativePrompt: input.negativePrompt,
       fidelity: input.fidelity,
+      primaryImageUrl: input.primaryImageUrl || null,
+      shortVideoScript: input.shortVideoScript || null,
+      socialCopy: input.socialCopy || null,
+      customerScript: input.customerScript || null,
+      status: input.status,
       materials: {
         create: input.materialIds.map((materialId) => ({ materialId })),
       },

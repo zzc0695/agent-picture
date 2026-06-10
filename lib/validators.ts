@@ -28,5 +28,10 @@ export const planSchema = z.object({
   optimizedPrompt: z.string().default(""),
   negativePrompt: z.string().default(""),
   fidelity: fidelitySchema,
+  primaryImageUrl: z.string().default(""),
+  shortVideoScript: z.string().default(""),
+  socialCopy: z.string().default(""),
+  customerScript: z.string().default(""),
+  status: z.string().default("draft"),
   materialIds: z.array(z.string()).default([]),
 });
