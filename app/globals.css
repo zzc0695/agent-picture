@@ -85,28 +85,39 @@ body {
   box-shadow: 0 12px 28px rgba(38, 122, 114, 0.28);
 }
 
+.mobile-flow-scroll {
+  scrollbar-width: none;
+}
+
+.mobile-flow-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .curtain-swatch-a {
   background:
-    radial-gradient(circle at 22% 24%, rgba(255, 255, 255, 0.72), transparent 25%),
-    repeating-linear-gradient(45deg, #f1e7d8 0 8px, #d7c1a8 8px 16px);
+    radial-gradient(ellipse at 28% 20%, rgba(255, 255, 255, 0.56), transparent 34%),
+    repeating-linear-gradient(35deg, rgba(121, 88, 54, 0.12) 0 3px, transparent 3px 12px),
+    linear-gradient(135deg, #f4eadb, #ceb292);
 }
 
 .curtain-swatch-b {
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.74), transparent 20% 80%, rgba(255, 255, 255, 0.72)),
-    repeating-linear-gradient(90deg, #ead9c0 0 8px, #c3a985 8px 12px);
+    linear-gradient(90deg, rgba(255, 255, 255, 0.78), transparent 18% 82%, rgba(255, 255, 255, 0.72)),
+    repeating-linear-gradient(90deg, #f2dfc3 0 7px, #c7a77f 7px 11px);
 }
 
 .curtain-swatch-c {
   background:
-    radial-gradient(circle at 50% 14%, #e9dbc8 0 9px, transparent 10px),
-    linear-gradient(90deg, #b58b62, #e6c7a8 35%, #94714f 70%, #d2ac86);
+    radial-gradient(circle at 54% 15%, #f1dfca 0 10px, transparent 11px),
+    radial-gradient(ellipse at 35% 55%, rgba(255, 255, 255, 0.24), transparent 35%),
+    linear-gradient(90deg, #a77b53, #e6c4a1 38%, #8d6746 72%, #cda47c);
 }
 
 .curtain-swatch-d {
   background:
-    radial-gradient(circle at 70% 45%, #ba9568 0 8px, transparent 9px),
-    linear-gradient(90deg, #cfb084, #846544);
+    radial-gradient(circle at 72% 42%, #c19b6e 0 8px, transparent 9px),
+    radial-gradient(circle at 28% 56%, rgba(255, 237, 202, 0.34), transparent 28%),
+    linear-gradient(90deg, #c7a476, #7b5f3f);
 }
 
 .room-scene {
@@ -128,6 +139,13 @@ body {
     linear-gradient(90deg, transparent 48%, rgba(52, 56, 60, 0.68) 48% 52%, transparent 52%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(222, 234, 238, 0.76));
   box-shadow: inset 0 0 0 8px rgba(255, 255, 255, 0.42);
+}
+
+.room-scene-result,
+.room-scene-customer {
+  background:
+    linear-gradient(90deg, #eee7dc 0 13%, transparent 13% 87%, #e8dfd4 87%),
+    linear-gradient(180deg, #f7f0e7 0 16%, #f0e8dc 16% 62%, #d1bda3 62% 100%);
 }
 
 .room-scene-empty::before {
@@ -158,6 +176,11 @@ body {
 .room-window {
   position: absolute;
   inset: 15% 17% 31%;
+}
+
+.room-scene-result .room-window,
+.room-scene-customer .room-window {
+  inset: 14% 12% 30%;
 }
 
 .window-pane {
@@ -210,6 +233,30 @@ body {
     linear-gradient(90deg, #c9b79f, #e6d9c8 50%, #b99f84);
 }
 
+.rug {
+  position: absolute;
+  left: 24%;
+  right: 10%;
+  bottom: 10%;
+  height: 26%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at center, rgba(238, 228, 214, 0.86), rgba(170, 148, 124, 0.28) 62%, transparent 68%);
+}
+
+.console {
+  position: absolute;
+  left: 5%;
+  bottom: 25%;
+  width: 24%;
+  height: 9%;
+  border-radius: 2px 2px 5px 5px;
+  background:
+    linear-gradient(90deg, rgba(110, 91, 68, 0.28), transparent 24% 76%, rgba(110, 91, 68, 0.2)),
+    linear-gradient(180deg, #d7c6ad, #a88963);
+  box-shadow: 0 8px 12px rgba(75, 55, 36, 0.13);
+}
+
 .sofa {
   position: absolute;
   right: 6%;
@@ -224,6 +271,14 @@ body {
   box-shadow: 0 9px 12px rgba(81, 62, 45, 0.16);
 }
 
+.room-scene-result .sofa,
+.room-scene-customer .sofa {
+  right: 5%;
+  bottom: 20%;
+  width: 48%;
+  height: 19%;
+}
+
 .table {
   position: absolute;
   left: 40%;
@@ -235,6 +290,21 @@ body {
     radial-gradient(circle at 44% 26%, #fbf7ef 0 5px, transparent 6px),
     linear-gradient(180deg, #c19b70, #8f704d);
   box-shadow: 0 10px 16px rgba(74, 55, 36, 0.2);
+}
+
+.vase {
+  position: absolute;
+  left: 49%;
+  bottom: 23%;
+  width: 7%;
+  height: 13%;
+  background:
+    radial-gradient(ellipse at 40% 12%, #c5a16f 0 4px, transparent 5px),
+    radial-gradient(ellipse at 65% 28%, #6f8355 0 6px, transparent 7px),
+    radial-gradient(ellipse at 42% 36%, #98a26e 0 5px, transparent 6px),
+    linear-gradient(90deg, transparent 45%, #7d6a48 45% 55%, transparent 55%),
+    linear-gradient(180deg, transparent 53%, #d9c0a0 53% 100%);
+  border-radius: 50% 50% 6px 6px;
 }
 
 .plant {
@@ -282,6 +352,13 @@ body {
   background:
     radial-gradient(circle at 62% 42%, rgba(170, 139, 101, 0.32) 0 22%, transparent 23%),
     #eee6db;
+}
+
+.room-scene-customer .art,
+.room-scene-result .art {
+  right: 5%;
+  top: 27%;
+  height: 21%;
 }
 
 @media (max-width: 520px) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const steps = ["房间图", "样本", "要求", "出图"];
 const customerName = "王女士";
@@ -61,6 +61,13 @@ export default function WorkbenchPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
   const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
+  const contentRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    contentRef.current.scrollTop = 0;
+    contentRef.current.scrollTo?.({ top: 0 });
+  }, [activeStep, customerTab]);
 
   async function postJson<T>(url: string, body: unknown): Promise<T> {
     const response = await fetch(url, {
@@ -174,7 +181,10 @@ export default function WorkbenchPage() {
             onCustomerTabChange={setCustomerTab}
             onStepChange={setActiveStep}
           />
-          <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-24">
+          <main
+            ref={contentRef}
+            className="mobile-flow-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-24"
+          >
             {activeStep === 0 ? (
               <RoomStep onNext={() => setActiveStep(1)} />
             ) : null}
@@ -951,7 +961,9 @@ function RoomScene({
 
   return (
     <div
-      className={`room-scene ${isEmpty ? "room-scene-empty" : ""} ${
+      className={`room-scene room-scene-${variant} ${
+        isEmpty ? "room-scene-empty" : ""
+      } ${
         isTall ? "aspect-[4/5]" : isCustomer ? "aspect-[16/11]" : "aspect-[16/10]"
       }`}
     >
@@ -968,9 +980,12 @@ function RoomScene({
       </div>
       {!isEmpty ? (
         <>
+          <div className="rug" />
+          <div className="console" />
           <div className="plant" />
           <div className="sofa" />
           <div className="table" />
+          <div className="vase" />
           <div className="lamp" />
           <div className="art" />
         </>
