@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { put } from "@vercel/blob";
 
 function storageRoot() {
   return process.env.LOCAL_FILE_ROOT ?? "./storage";
@@ -14,42 +15,70 @@ export function isSupportedImageFile(file: File) {
   );
 }
 
-export async function saveUploadedFile(file: File) {
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const extension = path.extname(file.name) || ".jpg";
-  const fileName = `${crypto.randomUUID()}${extension}`;
+function isBlobStorageEnabled() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
+function contentTypeForExtension(extension: string) {
+  const normalized = extension.toLowerCase();
+  if (normalized === ".jpg" || normalized === ".jpeg") return "image/jpeg";
+  if (normalized === ".webp") return "image/webp";
+  if (normalized === ".gif") return "image/gif";
+  return "image/png";
+}
+
+async function saveLocalUpload(fileName: string, bytes: Buffer) {
   const absoluteDir = path.resolve(storageRoot(), "uploads");
 
   await mkdir(absoluteDir, { recursive: true });
   await writeFile(path.join(absoluteDir, fileName), bytes);
 
   return `/uploads/${fileName}`;
+}
+
+async function saveBlobUpload(
+  fileName: string,
+  bytes: Buffer,
+  contentType: string,
+) {
+  const blob = await put(`uploads/${fileName}`, bytes, {
+    access: "public",
+    contentType,
+  });
+
+  return blob.url;
+}
+
+export async function saveUploadedFile(file: File) {
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const extension = path.extname(file.name) || ".jpg";
+  const fileName = `${crypto.randomUUID()}${extension}`;
+  const contentType = file.type || contentTypeForExtension(extension);
+
+  if (isBlobStorageEnabled()) {
+    return saveBlobUpload(fileName, bytes, contentType);
+  }
+
+  return saveLocalUpload(fileName, bytes);
 }
 
 export async function saveGeneratedImage(bytes: Buffer, format = "png") {
   const safeFormat = format.replace(/[^a-z0-9]/gi, "").toLowerCase() || "png";
   const extension = safeFormat === "jpeg" ? "jpg" : safeFormat;
   const fileName = `${crypto.randomUUID()}.${extension}`;
-  const absoluteDir = path.resolve(storageRoot(), "uploads");
 
-  await mkdir(absoluteDir, { recursive: true });
-  await writeFile(path.join(absoluteDir, fileName), bytes);
+  if (isBlobStorageEnabled()) {
+    return saveBlobUpload(fileName, bytes, contentTypeForExtension(`.${extension}`));
+  }
 
-  return `/uploads/${fileName}`;
+  return saveLocalUpload(fileName, bytes);
 }
 
 export async function readStoredUpload(fileName: string) {
   if (fileName !== path.basename(fileName)) return null;
 
   const extension = path.extname(fileName).toLowerCase();
-  const contentType =
-    extension === ".jpg" || extension === ".jpeg"
-      ? "image/jpeg"
-      : extension === ".webp"
-        ? "image/webp"
-        : extension === ".gif"
-          ? "image/gif"
-          : "image/png";
+  const contentType = contentTypeForExtension(extension);
   const absolutePath = path.resolve(storageRoot(), "uploads", fileName);
   const uploadRoot = path.resolve(storageRoot(), "uploads");
 

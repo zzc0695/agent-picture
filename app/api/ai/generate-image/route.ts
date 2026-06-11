@@ -7,6 +7,8 @@ import {
 import { db } from "@/lib/db";
 import { fidelitySchema } from "@/lib/validators";
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
   if (!session) return unauthorizedResponse();

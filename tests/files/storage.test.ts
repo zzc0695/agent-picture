@@ -17,6 +17,8 @@ describe("file storage", () => {
   afterEach(async () => {
     await rm(testRoot, { recursive: true, force: true });
     delete process.env.LOCAL_FILE_ROOT;
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    vi.doUnmock("@vercel/blob");
   });
 
   it("saves uploaded files under the configured upload root", async () => {
@@ -47,6 +49,28 @@ describe("file storage", () => {
     await expect(
       readFile(path.join(testRoot, url.replace(/^\//, "")), "utf8"),
     ).resolves.toBe("generated");
+  });
+
+  it("saves uploaded files to Vercel Blob when a blob token is configured", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test";
+    const put = vi.fn(async (pathname: string) => ({
+      url: `https://blob.example/${pathname}`,
+    }));
+    vi.doMock("@vercel/blob", () => ({ put }));
+    const { saveUploadedFile } = await import("@/lib/files/storage");
+    const file = new File(["image-bytes"], "room.png", { type: "image/png" });
+
+    const url = await saveUploadedFile(file);
+
+    expect(url).toMatch(/^https:\/\/blob\.example\/uploads\/.+\.png$/);
+    expect(put).toHaveBeenCalledWith(
+      expect.stringMatching(/^uploads\/.+\.png$/),
+      expect.any(Buffer),
+      {
+        access: "public",
+        contentType: "image/png",
+      },
+    );
   });
 
   it("reads stored upload bytes by file name", async () => {
