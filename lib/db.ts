@@ -3,11 +3,9 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const databaseUrl = process.env.DATABASE_URL;
+import { getDatabaseUrl } from "./db-url";
 
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
-}
+const databaseUrl = getDatabaseUrl(process.env);
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 const adapter = new PrismaPg({
