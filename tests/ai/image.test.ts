@@ -2,38 +2,44 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const generate = vi.fn();
-const saveGeneratedImage = vi.fn();
+const generateBailianImage = vi.hoisted(() => vi.fn());
+const saveGeneratedImage = vi.hoisted(() => vi.fn());
+const toBailianImageReference = vi.hoisted(() => vi.fn());
 
-vi.mock("openai", () => ({
-  default: vi.fn(function OpenAI() {
-    return {
-      images: {
-        generate,
-      },
-    };
+vi.mock("@/lib/ai/bailian", () => ({
+  getBailianConfig: () => ({
+    apiKey: process.env.DASHSCOPE_API_KEY,
+    imageModel: "wan2.7-image-pro",
+    textModel: "qwen3.7-plus",
   }),
+  generateBailianImage,
 }));
 
 vi.mock("@/lib/files/storage", () => ({
   saveGeneratedImage,
+  toBailianImageReference,
 }));
 
 describe("generateEffectImage", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    delete process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_IMAGE_MODEL;
+    delete process.env.DASHSCOPE_API_KEY;
+    toBailianImageReference.mockImplementation(async (url: string) => {
+      return "data:image/jpeg;base64," + url;
+    });
   });
 
-  it("uses the image generation API and persists returned image bytes", async () => {
-    process.env.OPENAI_API_KEY = "test-key";
-    process.env.OPENAI_IMAGE_MODEL = "gpt-image-1";
-    generate.mockResolvedValue({
-      data: [{ b64_json: Buffer.from("generated-image").toString("base64") }],
-    });
+  it("uses Bailian image generation and persists downloaded image bytes", async () => {
+    process.env.DASHSCOPE_API_KEY = "test-key";
+    generateBailianImage.mockResolvedValue("https://temporary.example/image.png");
     saveGeneratedImage.mockResolvedValue("/uploads/generated-effect.png");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(Buffer.from("generated-image"), { status: 200 }),
+      ),
+    );
 
     const { generateEffectImage } = await import("@/lib/ai/image");
 
@@ -45,14 +51,16 @@ describe("generateEffectImage", () => {
       fidelity: "balanced",
     });
 
-    expect(generate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "gpt-image-1",
-        prompt: expect.stringContaining("米白窗帘"),
-        n: 1,
-        size: "1024x1024",
-      }),
+    expect(generateBailianImage).toHaveBeenCalledWith(
+      "test-key",
+      "wan2.7-image-pro",
+      expect.arrayContaining([
+        { image: "data:image/jpeg;base64,/uploads/room.jpg" },
+        { image: "data:image/jpeg;base64,/uploads/sample.jpg" },
+        expect.objectContaining({ text: expect.stringContaining("米白窗帘") }),
+      ]),
     );
+    expect(fetch).toHaveBeenCalledWith("https://temporary.example/image.png");
     expect(saveGeneratedImage).toHaveBeenCalledWith(
       Buffer.from("generated-image"),
       "png",
@@ -63,9 +71,10 @@ describe("generateEffectImage", () => {
     });
   });
 
-  it("throws when the image API does not return image data", async () => {
-    process.env.OPENAI_API_KEY = "test-key";
-    generate.mockResolvedValue({ data: [{}] });
+  it("throws when the generated image cannot be downloaded", async () => {
+    process.env.DASHSCOPE_API_KEY = "test-key";
+    generateBailianImage.mockResolvedValue("https://temporary.example/image.png");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 502 })));
     const { generateEffectImage } = await import("@/lib/ai/image");
 
     await expect(
@@ -76,6 +85,6 @@ describe("generateEffectImage", () => {
         negativePrompt: "",
         fidelity: "strict",
       }),
-    ).rejects.toThrow("图片生成接口没有返回图片数据");
+    ).rejects.toThrow("无法下载图片生成结果");
   });
 });

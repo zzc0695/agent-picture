@@ -1,4 +1,8 @@
-import OpenAI from "openai";
+import {
+  createBailianTextClient,
+  extractChatCompletionText,
+  getBailianConfig,
+} from "@/lib/ai/bailian";
 
 export async function generateMarketingCopy(input: {
   materialSummary: string;
@@ -15,7 +19,9 @@ export async function generateMarketingCopy(input: {
     `客户备注：${input.customerNotes}`,
   ].join("\n");
 
-  if (!process.env.OPENAI_API_KEY) {
+  const config = getBailianConfig();
+
+  if (!config.apiKey) {
     return {
       shortVideoScript:
         "开场展示客户原房间，再切换窗帘上墙效果，重点讲遮光、垂感和整体氛围提升。",
@@ -26,15 +32,17 @@ export async function generateMarketingCopy(input: {
     };
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const response = await client.responses.create({
-    model: process.env.OPENAI_TEXT_MODEL ?? "gpt-5-mini",
-    input: prompt,
+  const response = await createBailianTextClient(
+    config.apiKey,
+  ).chat.completions.create({
+    model: config.textModel,
+    messages: [{ role: "user", content: prompt }],
   });
+  const copy = extractChatCompletionText(response);
 
   return {
-    shortVideoScript: response.output_text,
-    socialCopy: response.output_text,
-    customerScript: response.output_text,
+    shortVideoScript: copy,
+    socialCopy: copy,
+    customerScript: copy,
   };
 }

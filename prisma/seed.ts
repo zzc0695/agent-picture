@@ -60,7 +60,8 @@ async function main() {
       priceRange: "中高端",
       sizeNote: "适合客厅和卧室落地窗",
       sellingPoints: "遮光强、垂感好、质感柔和",
-      imageUrl: "/sample-material.jpg",
+      imageUrl:
+        "https://images.unsplash.com/photo-1583847268964-b28e50bc78d3?auto=format&fit=crop&w=800&q=85",
     },
   });
 }

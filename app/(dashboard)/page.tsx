@@ -54,8 +54,10 @@ const promptTemplates = [
 ];
 
 const materialSummary = "米白高遮光绒布窗帘，垂感好，搭配白纱帘和金色轨道";
-const demoRoomImageUrl = "/demo/room-before.jpg";
-const demoSampleImageUrl = "/demo/curtain-sample.jpg";
+const demoRoomImageUrl =
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=85";
+const demoSampleImageUrl =
+  "https://images.unsplash.com/photo-1583847268964-b28e50bc78d3?auto=format&fit=crop&w=800&q=85";
 
 const IMAGES = {
   room: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",

@@ -1,4 +1,8 @@
-import OpenAI from "openai";
+import {
+  createBailianTextClient,
+  extractChatCompletionText,
+  getBailianConfig,
+} from "@/lib/ai/bailian";
 import { fidelitySchema } from "@/lib/validators";
 
 type PromptInput = {
@@ -28,7 +32,9 @@ export async function optimizePrompt(input: PromptInput) {
   fidelitySchema.parse(input.fidelity);
   const prompt = buildOptimizedPromptInput(input);
 
-  if (!process.env.OPENAI_API_KEY) {
+  const config = getBailianConfig();
+
+  if (!config.apiKey) {
     return {
       optimizedPrompt: `${input.userPrompt}。保留原房间结构、窗户位置、透视角度，${fidelityText[input.fidelity]}真实摄影质感。`,
       negativePrompt:
@@ -36,14 +42,15 @@ export async function optimizePrompt(input: PromptInput) {
     };
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const response = await client.responses.create({
-    model: process.env.OPENAI_TEXT_MODEL ?? "gpt-5-mini",
-    input: prompt,
+  const response = await createBailianTextClient(
+    config.apiKey,
+  ).chat.completions.create({
+    model: config.textModel,
+    messages: [{ role: "user", content: prompt }],
   });
 
   return {
-    optimizedPrompt: response.output_text,
+    optimizedPrompt: extractChatCompletionText(response),
     negativePrompt:
       "避免窗户变形、房间结构变化、窗帘位置错误、花纹跑偏、渲染不真实。",
   };

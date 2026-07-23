@@ -93,4 +93,18 @@ describe("file storage", () => {
 
     await expect(readStoredUpload("../secret.png")).resolves.toBeNull();
   });
+
+  it("keeps public URLs and converts local uploads to data URLs", async () => {
+    const { saveGeneratedImage, toBailianImageReference } = await import(
+      "@/lib/files/storage"
+    );
+    const localUrl = await saveGeneratedImage(Buffer.from("room-bytes"), "jpg");
+
+    await expect(
+      toBailianImageReference("https://blob.example/room.png"),
+    ).resolves.toBe("https://blob.example/room.png");
+    await expect(toBailianImageReference(localUrl)).resolves.toBe(
+      "data:image/jpeg;base64," + Buffer.from("room-bytes").toString("base64"),
+    );
+  });
 });

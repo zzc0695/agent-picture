@@ -93,3 +93,44 @@ export async function readStoredUpload(fileName: string) {
     return null;
   }
 }
+
+async function readPublicImage(imageUrl: string) {
+  if (!imageUrl.startsWith("/")) return null;
+
+  const publicRoot = path.resolve("public");
+  const relativePath = imageUrl.replace(/^\/+/, "");
+  const absolutePath = path.resolve(publicRoot, relativePath);
+
+  if (
+    absolutePath !== publicRoot &&
+    !absolutePath.startsWith(publicRoot + path.sep)
+  ) {
+    return null;
+  }
+
+  try {
+    return {
+      bytes: await readFile(absolutePath),
+      contentType: contentTypeForExtension(path.extname(absolutePath)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function toBailianImageReference(imageUrl: string) {
+  if (/^https?:\/\//i.test(imageUrl) || imageUrl.startsWith("data:image/")) {
+    return imageUrl;
+  }
+
+  const upload = imageUrl.startsWith("/uploads/")
+    ? await readStoredUpload(path.basename(imageUrl))
+    : null;
+  const image = upload ?? (await readPublicImage(imageUrl));
+
+  if (!image) {
+    throw new Error("无法读取用于图片生成的参考图");
+  }
+
+  return "data:" + image.contentType + ";base64," + image.bytes.toString("base64");
+}
