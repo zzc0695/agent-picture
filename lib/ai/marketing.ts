@@ -1,8 +1,13 @@
+import type OpenAI from "openai";
 import {
   createBailianTextClient,
   extractChatCompletionText,
   getBailianConfig,
 } from "@/lib/ai/bailian";
+
+type BailianChatRequest = OpenAI.ChatCompletionCreateParamsNonStreaming & {
+  enable_thinking: boolean;
+};
 
 export async function generateMarketingCopy(input: {
   materialSummary: string;
@@ -32,12 +37,14 @@ export async function generateMarketingCopy(input: {
     };
   }
 
-  const response = await createBailianTextClient(
-    config.apiKey,
-  ).chat.completions.create({
+  const request: BailianChatRequest = {
     model: config.textModel,
     messages: [{ role: "user", content: prompt }],
-  });
+    enable_thinking: false,
+  };
+  const response = await createBailianTextClient(
+    config.apiKey,
+  ).chat.completions.create(request);
   const copy = extractChatCompletionText(response);
 
   return {

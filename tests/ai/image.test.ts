@@ -9,8 +9,8 @@ const toBailianImageReference = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/ai/bailian", () => ({
   getBailianConfig: () => ({
     apiKey: process.env.DASHSCOPE_API_KEY,
-    imageModel: "wan2.7-image-pro",
-    textModel: "qwen3.7-plus",
+    imageModel: "qwen-image-3.0",
+    textModel: "qwen3.7-flash",
   }),
   generateBailianImage,
 }));
@@ -53,12 +53,15 @@ describe("generateEffectImage", () => {
 
     expect(generateBailianImage).toHaveBeenCalledWith(
       "test-key",
-      "wan2.7-image-pro",
-      expect.arrayContaining([
+      "qwen-image-3.0",
+      [
         { image: "data:image/jpeg;base64,/uploads/room.jpg" },
         { image: "data:image/jpeg;base64,/uploads/sample.jpg" },
-        expect.objectContaining({ text: expect.stringContaining("米白窗帘") }),
-      ]),
+        expect.objectContaining({
+          text: expect.stringContaining("图1是原房间，图2是材质样本"),
+        }),
+      ],
+      { negativePrompt: "避免窗户变形" },
     );
     expect(fetch).toHaveBeenCalledWith("https://temporary.example/image.png");
     expect(saveGeneratedImage).toHaveBeenCalledWith(

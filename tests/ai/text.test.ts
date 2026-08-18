@@ -7,8 +7,8 @@ const completionCreate = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/ai/bailian", () => ({
   getBailianConfig: () => ({
     apiKey: process.env.DASHSCOPE_API_KEY,
-    textModel: "qwen3.7-plus",
-    imageModel: "wan2.7-image-pro",
+    textModel: "qwen3.7-flash",
+    imageModel: "qwen-image-3.0",
   }),
   createBailianTextClient: () => ({
     chat: {
@@ -44,7 +44,8 @@ describe("Bailian text generation", () => {
     ).resolves.toMatchObject({ optimizedPrompt: "优化后的提示词" });
     expect(completionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: "qwen3.7-plus",
+        model: "qwen3.7-flash",
+        enable_thinking: false,
         messages: expect.arrayContaining([
           expect.objectContaining({ content: expect.stringContaining("米白窗帘") }),
         ]),
@@ -71,5 +72,11 @@ describe("Bailian text generation", () => {
       socialCopy: "可直接使用的营销文案",
       customerScript: "可直接使用的营销文案",
     });
+    expect(completionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "qwen3.7-flash",
+        enable_thinking: false,
+      }),
+    );
   });
 });

@@ -1,9 +1,14 @@
+import type OpenAI from "openai";
 import {
   createBailianTextClient,
   extractChatCompletionText,
   getBailianConfig,
 } from "@/lib/ai/bailian";
 import { fidelitySchema } from "@/lib/validators";
+
+type BailianChatRequest = OpenAI.ChatCompletionCreateParamsNonStreaming & {
+  enable_thinking: boolean;
+};
 
 type PromptInput = {
   userPrompt: string;
@@ -42,12 +47,14 @@ export async function optimizePrompt(input: PromptInput) {
     };
   }
 
-  const response = await createBailianTextClient(
-    config.apiKey,
-  ).chat.completions.create({
+  const request: BailianChatRequest = {
     model: config.textModel,
     messages: [{ role: "user", content: prompt }],
-  });
+    enable_thinking: false,
+  };
+  const response = await createBailianTextClient(
+    config.apiKey,
+  ).chat.completions.create(request);
 
   return {
     optimizedPrompt: extractChatCompletionText(response),

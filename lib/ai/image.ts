@@ -25,10 +25,13 @@ export async function generateEffectImage(input: {
     };
   }
 
+  const imageRoleText = input.referenceImageUrl
+    ? "图1是原房间，图2是材质样本，图3是当前效果参考。"
+    : "图1是原房间，图2是材质样本。";
   const prompt = [
+    imageRoleText,
     "生成一张真实摄影质感的软装效果图。",
     "生成要求：" + input.optimizedPrompt,
-    "负向要求：" + input.negativePrompt,
     "样本还原度：" + input.fidelity,
     "必须保留原房间结构、窗户位置、透视角度和主要光线方向。",
   ]
@@ -52,6 +55,7 @@ export async function generateEffectImage(input: {
     config.apiKey,
     config.imageModel,
     content,
+    { negativePrompt: input.negativePrompt },
   );
   const imageResponse = await fetch(temporaryImageUrl);
 

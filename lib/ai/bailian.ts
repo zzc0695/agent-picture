@@ -10,6 +10,10 @@ export type BailianContentPart =
   | BailianImageContentPart
   | BailianTextContentPart;
 
+export type BailianImageOptions = {
+  negativePrompt?: string;
+};
+
 type BailianImageResponse = {
   output?: {
     choices?: Array<{
@@ -26,8 +30,8 @@ type BailianImageResponse = {
 export function getBailianConfig(env: NodeJS.ProcessEnv = process.env) {
   return {
     apiKey: env.DASHSCOPE_API_KEY,
-    textModel: env.DASHSCOPE_TEXT_MODEL ?? "qwen3.7-plus",
-    imageModel: env.DASHSCOPE_IMAGE_MODEL ?? "wan2.7-image-pro",
+    textModel: env.DASHSCOPE_TEXT_MODEL ?? "qwen3.7-flash",
+    imageModel: env.DASHSCOPE_IMAGE_MODEL ?? "qwen-image-3.0",
   };
 }
 
@@ -82,6 +86,7 @@ export async function generateBailianImage(
   apiKey: string,
   model: string,
   content: BailianContentPart[],
+  options: BailianImageOptions = {},
 ) {
   const response = await fetch(imageEndpoint, {
     method: "POST",
@@ -96,6 +101,10 @@ export async function generateBailianImage(
       },
       parameters: {
         size: "1024*1024",
+        n: 1,
+        negative_prompt: options.negativePrompt || undefined,
+        prompt_extend: true,
+        watermark: false,
       },
     }),
   });
