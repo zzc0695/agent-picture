@@ -38,15 +38,10 @@ The production build runs:
 npm run build
 ```
 
-That script runs `prisma generate` before `next build`.
-
-Run database migrations against the production Postgres database before using
-the deployed app:
-
-```powershell
-$env:DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"
-npm run prisma:deploy
-```
+The build automatically runs `prisma migrate deploy` before `prisma generate`
+and `next build`. Vercel must provide `DATABASE_URL` or `STORAGE_URL` to both
+Production and Preview environments that should deploy. A missing connection or
+failed migration stops the deployment before the application build.
 
 Seed the demo merchant only if this environment should include the demo login:
 
