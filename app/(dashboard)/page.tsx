@@ -111,11 +111,14 @@ export default function WorkbenchPage() {
   const [optimizedPrompt, setOptimizedPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [fidelity, setFidelity] = useState<Fidelity>("balanced");
+  const [roomImageUrl, setRoomImageUrl] = useState(demoRoomImageUrl);
+  const [sampleImageUrl, setSampleImageUrl] = useState(demoSampleImageUrl);
   const [imageUrl, setImageUrl] = useState("");
   const [shortVideoScript, setShortVideoScript] = useState("");
   const [socialCopy, setSocialCopy] = useState("");
   const [customerScript, setCustomerScript] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState("");
   const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
   const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
   const frameRef = useRef<HTMLDivElement>(null);
@@ -159,14 +162,45 @@ export default function WorkbenchPage() {
     }
   }
 
+  async function uploadImage(file: File, target: "room" | "sample") {
+    setBusyAction(`upload-${target}`);
+    setUploadError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/files", {
+        method: "POST",
+        body: formData,
+      });
+      const result = (await response.json()) as { url?: string; error?: string };
+
+      if (!response.ok || !result.url) {
+        throw new Error(result.error || "图片上传失败，请稍后重试");
+      }
+
+      if (target === "room") {
+        setRoomImageUrl(result.url);
+      } else {
+        setSampleImageUrl(result.url);
+      }
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "图片上传失败，请稍后重试",
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function generateImage(referenceImageUrl?: string) {
     setBusyAction("generate");
     try {
       const result = await postJson<{ imageUrl: string; inputSummary: string }>(
         "/api/ai/generate-image",
         {
-          roomImageUrl: demoRoomImageUrl,
-          sampleImageUrl: demoSampleImageUrl,
+          roomImageUrl,
+          sampleImageUrl,
           optimizedPrompt: optimizedPrompt || prompt,
           negativePrompt,
           fidelity,
@@ -190,7 +224,7 @@ export default function WorkbenchPage() {
       }>("/api/ai/generate-marketing", {
         materialSummary,
         roomSummary: optimizedPrompt || prompt,
-        effectImageUrl: imageUrl || demoRoomImageUrl,
+        effectImageUrl: imageUrl || roomImageUrl,
         customerNotes: "王女士客厅窗帘方案",
       });
       setShortVideoScript(result.shortVideoScript);
@@ -207,13 +241,13 @@ export default function WorkbenchPage() {
       await postJson("/api/plans", {
         customerName: "王女士",
         notes: "客厅窗帘方案",
-        roomImageUrl: demoRoomImageUrl,
-        sampleImageUrl: demoSampleImageUrl,
+        roomImageUrl,
+        sampleImageUrl,
         originalPrompt: roomPrompt,
         optimizedPrompt: optimizedPrompt || prompt,
         negativePrompt,
         fidelity,
-        primaryImageUrl: imageUrl || demoRoomImageUrl,
+        primaryImageUrl: imageUrl || roomImageUrl,
         shortVideoScript,
         socialCopy,
         customerScript,
@@ -235,8 +269,14 @@ export default function WorkbenchPage() {
             {activeStep === 0 ? (
               <PageWrapper id="editor">
                 <EditorView
+                  roomImageUrl={roomImageUrl}
+                  sampleImageUrl={sampleImageUrl}
+                  busyAction={busyAction}
+                  uploadError={uploadError}
                   onBack={() => undefined}
                   onNext={() => setActiveStep(1)}
+                  onUploadRoom={(file) => uploadImage(file, "room")}
+                  onUploadSample={(file) => uploadImage(file, "sample")}
                 />
               </PageWrapper>
             ) : null}
@@ -375,12 +415,29 @@ function StudioHeader({
 }
 
 function EditorView({
+  roomImageUrl,
+  sampleImageUrl,
+  busyAction,
+  uploadError,
   onBack,
   onNext,
+  onUploadRoom,
+  onUploadSample,
 }: {
+  roomImageUrl: string;
+  sampleImageUrl: string;
+  busyAction: string | null;
+  uploadError: string;
   onBack: () => void;
   onNext: () => void;
+  onUploadRoom: (file: File) => void;
+  onUploadSample: (file: File) => void;
 }) {
+  const roomFileInputRef = useRef<HTMLInputElement>(null);
+  const sampleFileInputRef = useRef<HTMLInputElement>(null);
+  const roomUploading = busyAction === "upload-room";
+  const sampleUploading = busyAction === "upload-sample";
+
   return (
     <div className="relative flex h-full flex-col">
       <StudioHeader
@@ -427,7 +484,7 @@ function EditorView({
           <div className="rounded-[24px] border border-white bg-white p-2 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)]">
             <div className="group relative aspect-[4/3] overflow-hidden rounded-[16px] bg-stone-50">
               <img
-                src={IMAGES.room}
+                src={roomImageUrl}
                 alt="客户空间"
                 className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -438,15 +495,31 @@ function EditorView({
               </div>
             </div>
             <div className="mt-1 flex divide-x divide-stone-100 py-2">
+              <input
+                ref={roomFileInputRef}
+                type="file"
+                accept="image/*"
+                aria-label="上传客户空间图片"
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (file) onUploadRoom(file);
+                  event.currentTarget.value = "";
+                }}
+              />
               <button
                 type="button"
+                onClick={() => roomFileInputRef.current?.click()}
+                disabled={roomUploading}
                 className="flex flex-1 items-center justify-center gap-2 text-[12px] font-medium tracking-wide text-stone-500 transition-colors hover:text-sage"
               >
                 <UploadCloud size={14} strokeWidth={2} />
-                重新上传
+                {roomUploading ? "上传中..." : "重新上传"}
               </button>
               <button
                 type="button"
+                onClick={() => roomFileInputRef.current?.click()}
+                disabled={roomUploading}
                 className="flex flex-1 items-center justify-center gap-2 text-[12px] font-medium tracking-wide text-stone-500 transition-colors hover:text-sage"
               >
                 <RefreshCw size={14} strokeWidth={2} />
@@ -467,35 +540,53 @@ function EditorView({
               材质样本
             </h2>
             <span className="text-[11px] tracking-wide text-stone-400">
-              已选 4 项
+              已选 1 项
             </span>
           </div>
 
           <div className="hide-scrollbar -mx-2 flex gap-4 overflow-x-auto px-2 pb-6 pt-2">
-            {[
-              "curtain-swatch-a",
-              "curtain-swatch-b",
-              "curtain-swatch-c",
-              "curtain-swatch-d",
-            ].map((swatch, index) => (
-                <motion.div
-                  whileHover={{ y: -4, rotate: index % 2 === 0 ? 2 : -2 }}
-                  key={swatch}
-                  aria-label={`材质样本 ${index + 1}`}
-                  className={`group relative h-28 w-24 flex-shrink-0 overflow-hidden rounded-2xl border-[3px] border-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.15)] ${swatch}`}
-                >
-                  <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5" />
-                </motion.div>
-              ))}
+            <motion.div
+              whileHover={{ y: -4, rotate: 2 }}
+              className="group relative h-28 w-24 flex-shrink-0 overflow-hidden rounded-2xl border-[3px] border-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.15)]"
+            >
+              <img
+                src={sampleImageUrl}
+                alt="已选材质样本"
+                className="h-full w-full object-cover"
+              />
+              <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5" />
+            </motion.div>
+            <input
+              ref={sampleFileInputRef}
+              type="file"
+              accept="image/*"
+              aria-label="上传材质样本图片"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) onUploadSample(file);
+                event.currentTarget.value = "";
+              }}
+            />
             <button
               type="button"
+              onClick={() => sampleFileInputRef.current?.click()}
+              disabled={sampleUploading}
               className="flex h-28 w-24 flex-shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 text-stone-400 transition-all hover:border-sage/30 hover:bg-white hover:text-sage"
             >
               <Plus size={20} strokeWidth={1.5} />
-              <span className="text-[10px] font-medium tracking-wider">添加</span>
+              <span className="text-[10px] font-medium tracking-wider">
+                {sampleUploading ? "上传中..." : "添加"}
+              </span>
             </button>
           </div>
         </motion.section>
+
+        {uploadError ? (
+          <p role="alert" className="mb-6 px-2 text-[12px] text-red-600">
+            {uploadError}
+          </p>
+        ) : null}
 
         <motion.section
           initial={{ opacity: 0, y: 10 }}

@@ -5,8 +5,14 @@ import WorkbenchPage from "@/app/(dashboard)/page";
 import { ResultPanel } from "@/components/result-panel";
 
 function mockApiResponses() {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+
+    if (url.endsWith("/api/files")) {
+      const form = init?.body as FormData;
+      const file = form.get("file") as File;
+      return Response.json({ url: `https://blob.test/${file.name}` });
+    }
 
     if (url.endsWith("/api/ai/optimize-prompt")) {
       return Response.json({
@@ -119,6 +125,45 @@ describe("WorkbenchPage", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/plans",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("uploads room and sample images and uses them for generation", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockApiResponses();
+
+    render(<WorkbenchPage />);
+
+    await user.upload(
+      screen.getByLabelText("上传客户空间图片"),
+      new File(["room"], "room.png", { type: "image/png" }),
+    );
+    expect(await screen.findByAltText("客户空间")).toHaveAttribute(
+      "src",
+      "https://blob.test/room.png",
+    );
+
+    await user.upload(
+      screen.getByLabelText("上传材质样本图片"),
+      new File(["sample"], "sample.png", { type: "image/png" }),
+    );
+    expect(await screen.findByAltText("已选材质样本")).toHaveAttribute(
+      "src",
+      "https://blob.test/sample.png",
+    );
+
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
+
+    const generationCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/api/ai/generate-image"),
+    );
+    expect(JSON.parse(String(generationCall?.[1]?.body))).toEqual(
+      expect.objectContaining({
+        roomImageUrl: "https://blob.test/room.png",
+        sampleImageUrl: "https://blob.test/sample.png",
+      }),
     );
   });
 
