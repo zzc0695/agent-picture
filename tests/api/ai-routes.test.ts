@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as generateImagePost } from "@/app/api/ai/generate-image/route";
+import { POST as analyzeMaterialsPost } from "@/app/api/ai/analyze-materials/route";
 import { POST as optimizePromptPost } from "@/app/api/ai/optimize-prompt/route";
+import { analyzeMaterials } from "@/lib/ai/material-analysis";
 import { generateEffectImage } from "@/lib/ai/image";
 import { optimizePrompt } from "@/lib/ai/prompt";
 import { db } from "@/lib/db";
@@ -24,6 +26,10 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/ai/image", () => ({
   generateEffectImage: vi.fn(),
+}));
+
+vi.mock("@/lib/ai/material-analysis", () => ({
+  analyzeMaterials: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/prompt", () => ({
@@ -77,5 +83,45 @@ describe("AI API routes", () => {
     });
     expect(generateEffectImage).not.toHaveBeenCalled();
     expect(db.generationRecord.create).not.toHaveBeenCalled();
+  });
+
+  it("validates and records three-image material analysis", async () => {
+    vi.mocked(analyzeMaterials).mockResolvedValue({
+      roomSummary: "明亮客厅",
+      styleSummary: "米白双层帘",
+      materialSummary: "细密遮光布",
+      templatePrompt: "为落地窗安装米白双层帘。",
+    });
+
+    const response = await analyzeMaterialsPost(
+      jsonRequest("http://localhost/api/ai/analyze-materials", {
+        roomImageUrl: "/uploads/room.jpg",
+        styleImageUrl: "/uploads/style.jpg",
+        detailImageUrl: "/uploads/detail.jpg",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(analyzeMaterials).toHaveBeenCalledWith({
+      roomImageUrl: "/uploads/room.jpg",
+      styleImageUrl: "/uploads/style.jpg",
+      detailImageUrl: "/uploads/detail.jpg",
+    });
+    expect(db.generationRecord.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: "material_analysis" }),
+    });
+  });
+
+  it("rejects incomplete material analysis input", async () => {
+    const response = await analyzeMaterialsPost(
+      jsonRequest("http://localhost/api/ai/analyze-materials", {
+        roomImageUrl: "/uploads/room.jpg",
+        styleImageUrl: "",
+        detailImageUrl: "/uploads/detail.jpg",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(analyzeMaterials).not.toHaveBeenCalled();
   });
 });
