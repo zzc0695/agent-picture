@@ -32,7 +32,8 @@ export async function PATCH(
   const session = await requireMerchantSession();
   if (!session) return unauthorizedResponse();
   const { id } = await params;
-  const parsed = planSchema.partial().safeParse(await request.json());
+  const body = (await request.json()) as Record<string, unknown>;
+  const parsed = planSchema.partial().safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "客户方案信息不完整", issues: parsed.error.issues },
@@ -41,8 +42,13 @@ export async function PATCH(
   }
 
   const input = parsed.data;
-  const planInput = { ...input };
+  const planInput = Object.fromEntries(
+    Object.entries(input).filter(([key]) => key in body),
+  );
   delete planInput.materialIds;
+  if (typeof input.styleImageUrl === "string" && "styleImageUrl" in body) {
+    planInput.sampleImageUrl = input.styleImageUrl;
+  }
   const plan = await db.customerPlan.update({
     where: { id, merchantId: session.merchantId },
     data: planInput,
