@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { materialSchema, planSchema } from "@/lib/validators";
+import {
+  materialAnalysisRequestSchema,
+  materialSchema,
+  planSchema,
+} from "@/lib/validators";
 
 describe("validators", () => {
   it("accepts a valid material", () => {
@@ -31,5 +35,41 @@ describe("validators", () => {
         materialIds: [],
       }),
     ).toThrow();
+  });
+
+  it("accepts three role-specific analysis images", () => {
+    expect(
+      materialAnalysisRequestSchema.parse({
+        roomImageUrl: "/uploads/room.jpg",
+        styleImageUrl: "/uploads/style.jpg",
+        detailImageUrl: "/uploads/detail.jpg",
+      }),
+    ).toEqual({
+      roomImageUrl: "/uploads/room.jpg",
+      styleImageUrl: "/uploads/style.jpg",
+      detailImageUrl: "/uploads/detail.jpg",
+    });
+  });
+
+  it("accepts role-specific plan images and analysis JSON", () => {
+    expect(
+      planSchema.parse({
+        customerName: "王女士",
+        notes: "",
+        roomImageUrl: "/uploads/room.jpg",
+        sampleImageUrl: "/uploads/style.jpg",
+        styleImageUrl: "/uploads/style.jpg",
+        detailImageUrl: "/uploads/detail.jpg",
+        imageAnalysis: JSON.stringify({ roomSummary: "现代客厅" }),
+        originalPrompt: "米白窗帘",
+        optimizedPrompt: "",
+        negativePrompt: "",
+        fidelity: "strict",
+        materialIds: [],
+      }),
+    ).toMatchObject({
+      styleImageUrl: "/uploads/style.jpg",
+      detailImageUrl: "/uploads/detail.jpg",
+    });
   });
 });

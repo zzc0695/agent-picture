@@ -52,6 +52,9 @@ model CustomerPlan {
   notes            String
   roomImageUrl     String
   sampleImageUrl   String
+  styleImageUrl    String?
+  detailImageUrl   String?
+  imageAnalysis    String             @default("{}")
   originalPrompt   String
   optimizedPrompt  String
   negativePrompt   String

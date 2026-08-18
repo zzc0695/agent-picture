@@ -19,11 +19,27 @@ export const promptTemplateSchema = z.object({
 
 export const fidelitySchema = z.enum(["strict", "balanced", "creative"]);
 
+export const materialAnalysisRequestSchema = z.object({
+  roomImageUrl: z.string().min(1),
+  styleImageUrl: z.string().min(1),
+  detailImageUrl: z.string().min(1),
+});
+
+export const materialAnalysisResultSchema = z.object({
+  roomSummary: z.string().min(1),
+  styleSummary: z.string().min(1),
+  materialSummary: z.string().min(1),
+  templatePrompt: z.string().min(1),
+});
+
 export const planSchema = z.object({
   customerName: z.string().min(1),
   notes: z.string().default(""),
   roomImageUrl: z.string().min(1),
   sampleImageUrl: z.string().min(1),
+  styleImageUrl: z.string().min(1),
+  detailImageUrl: z.string().min(1),
+  imageAnalysis: z.string().default("{}"),
   originalPrompt: z.string().min(1),
   optimizedPrompt: z.string().default(""),
   negativePrompt: z.string().default(""),
