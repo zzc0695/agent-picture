@@ -32,6 +32,18 @@ export const materialAnalysisResultSchema = z.object({
   templatePrompt: z.string().min(1),
 });
 
+export const imageGenerationRequestSchema = z.object({
+  roomImageUrl: z.string().min(1),
+  styleImageUrl: z.string().min(1),
+  detailImageUrl: z.string().min(1),
+  optimizedPrompt: z.string().min(1),
+  negativePrompt: z.string().default(""),
+  fidelity: fidelitySchema,
+  imageAnalysis: z.string().default(""),
+  referenceImageUrl: z.string().min(1).optional(),
+  planId: z.string().min(1).optional(),
+});
+
 export const planSchema = z.object({
   customerName: z.string().min(1),
   notes: z.string().default(""),

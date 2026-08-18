@@ -5,7 +5,10 @@ import {
   unauthorizedResponse,
 } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
-import { fidelitySchema } from "@/lib/validators";
+import {
+  fidelitySchema,
+  imageGenerationRequestSchema,
+} from "@/lib/validators";
 
 export const maxDuration = 60;
 
@@ -21,21 +24,32 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await generateEffectImage({
-    roomImageUrl: String(body.roomImageUrl ?? ""),
-    sampleImageUrl: String(body.sampleImageUrl ?? ""),
-    optimizedPrompt: String(body.optimizedPrompt ?? ""),
-    negativePrompt: String(body.negativePrompt ?? ""),
+  const parsed = imageGenerationRequestSchema.safeParse({
+    ...body,
     fidelity: parsedFidelity.data,
-    referenceImageUrl: body.referenceImageUrl
-      ? String(body.referenceImageUrl)
-      : undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "效果图生成信息不完整", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const result = await generateEffectImage({
+    roomImageUrl: parsed.data.roomImageUrl,
+    styleImageUrl: parsed.data.styleImageUrl,
+    detailImageUrl: parsed.data.detailImageUrl,
+    optimizedPrompt: parsed.data.optimizedPrompt,
+    negativePrompt: parsed.data.negativePrompt,
+    fidelity: parsed.data.fidelity,
+    imageAnalysis: parsed.data.imageAnalysis,
+    referenceImageUrl: parsed.data.referenceImageUrl,
   });
 
   await db.generationRecord.create({
     data: {
       merchantId: session.merchantId,
-      planId: body.planId ? String(body.planId) : undefined,
+      planId: parsed.data.planId,
       type: "image_generation",
       inputSummary: result.inputSummary,
       status: "succeeded",

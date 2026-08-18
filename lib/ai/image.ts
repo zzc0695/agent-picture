@@ -10,10 +10,12 @@ import {
 
 export async function generateEffectImage(input: {
   roomImageUrl: string;
-  sampleImageUrl: string;
+  styleImageUrl: string;
+  detailImageUrl: string;
   optimizedPrompt: string;
   negativePrompt: string;
   fidelity: string;
+  imageAnalysis: string;
   referenceImageUrl?: string;
 }) {
   const config = getBailianConfig();
@@ -26,28 +28,25 @@ export async function generateEffectImage(input: {
   }
 
   const imageRoleText = input.referenceImageUrl
-    ? "图1是原房间，图2是材质样本，图3是当前效果参考。"
-    : "图1是原房间，图2是材质样本。";
+    ? "图1是当前效果图，作为空间结构与构图基础；图2是窗帘整体款式；图3是材质细节。"
+    : "图1是原房间，图2是窗帘整体款式，图3是材质细节。";
   const prompt = [
     imageRoleText,
     "生成一张真实摄影质感的软装效果图。",
     "生成要求：" + input.optimizedPrompt,
     "样本还原度：" + input.fidelity,
+    input.imageAnalysis ? "图片识别摘要：" + input.imageAnalysis : "",
     "必须保留原房间结构、窗户位置、透视角度和主要光线方向。",
   ]
     .filter(Boolean)
     .join("\n");
 
+  const baseImageUrl = input.referenceImageUrl ?? input.roomImageUrl;
   const content: BailianContentPart[] = [
-    { image: await toBailianImageReference(input.roomImageUrl) },
-    { image: await toBailianImageReference(input.sampleImageUrl) },
+    { image: await toBailianImageReference(baseImageUrl) },
+    { image: await toBailianImageReference(input.styleImageUrl) },
+    { image: await toBailianImageReference(input.detailImageUrl) },
   ];
-
-  if (input.referenceImageUrl) {
-    content.push({
-      image: await toBailianImageReference(input.referenceImageUrl),
-    });
-  }
 
   content.push({ text: prompt });
 
