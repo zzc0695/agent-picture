@@ -85,7 +85,6 @@ describe("plans API", () => {
   it("creates plans with both material roles and a legacy style fallback", async () => {
     vi.mocked(db.customerPlan.create).mockResolvedValueOnce({
       ...storedPlan,
-      materials: [{ planId: "plan_1", materialId: "material_1" }],
     });
     const imageAnalysis = JSON.stringify({ roomSummary: "明亮客厅" });
 

@@ -25,6 +25,7 @@ import {
   Sparkles,
   UploadCloud,
   Wand2,
+  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -58,6 +59,8 @@ const demoRoomImageUrl =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=85";
 const demoSampleImageUrl =
   "https://images.unsplash.com/photo-1583847268964-b28e50bc78d3?auto=format&fit=crop&w=800&q=85";
+const demoDetailImageUrl =
+  "https://images.unsplash.com/photo-1596484552834-58eb4ea79eb6?auto=format&fit=crop&w=800&q=85";
 
 const IMAGES = {
   room: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
@@ -90,6 +93,12 @@ const fidelityOptions = [
 type FlowStep = 0 | 1 | 2 | 3;
 type Fidelity = "strict" | "balanced" | "creative";
 type CustomerTab = "effect" | "details";
+type MaterialAnalysis = {
+  roomSummary: string;
+  styleSummary: string;
+  materialSummary: string;
+  templatePrompt: string;
+};
 
 const pageEase = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -112,13 +121,16 @@ export default function WorkbenchPage() {
   const [negativePrompt, setNegativePrompt] = useState("");
   const [fidelity, setFidelity] = useState<Fidelity>("balanced");
   const [roomImageUrl, setRoomImageUrl] = useState(demoRoomImageUrl);
-  const [sampleImageUrl, setSampleImageUrl] = useState(demoSampleImageUrl);
+  const [styleImageUrl, setStyleImageUrl] = useState(demoSampleImageUrl);
+  const [detailImageUrl, setDetailImageUrl] = useState(demoDetailImageUrl);
+  const [imageAnalysis, setImageAnalysis] = useState<MaterialAnalysis | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [shortVideoScript, setShortVideoScript] = useState("");
   const [socialCopy, setSocialCopy] = useState("");
   const [customerScript, setCustomerScript] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState("");
+  const [analysisError, setAnalysisError] = useState("");
   const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
   const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
   const frameRef = useRef<HTMLDivElement>(null);
@@ -151,7 +163,9 @@ export default function WorkbenchPage() {
         negativePrompt: string;
       }>("/api/ai/optimize-prompt", {
         userPrompt: prompt,
-        materialSummary,
+        materialSummary: imageAnalysis
+          ? `${imageAnalysis.styleSummary}；${imageAnalysis.materialSummary}`
+          : materialSummary,
         fidelity,
       });
       setPrompt(result.optimizedPrompt);
@@ -162,7 +176,7 @@ export default function WorkbenchPage() {
     }
   }
 
-  async function uploadImage(file: File, target: "room" | "sample") {
+  async function uploadImage(file: File, target: "room" | "style" | "detail") {
     setBusyAction(`upload-${target}`);
     setUploadError("");
 
@@ -181,12 +195,46 @@ export default function WorkbenchPage() {
 
       if (target === "room") {
         setRoomImageUrl(result.url);
+      } else if (target === "style") {
+        setStyleImageUrl(result.url);
       } else {
-        setSampleImageUrl(result.url);
+        setDetailImageUrl(result.url);
       }
+      setImageAnalysis(null);
+      setAnalysisError("");
     } catch (error) {
       setUploadError(
         error instanceof Error ? error.message : "图片上传失败，请稍后重试",
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  function removeImage(target: "room" | "style" | "detail") {
+    if (target === "room") setRoomImageUrl("");
+    if (target === "style") setStyleImageUrl("");
+    if (target === "detail") setDetailImageUrl("");
+    setImageAnalysis(null);
+    setAnalysisError("");
+  }
+
+  async function analyzeUploadedImages() {
+    setBusyAction("analyze");
+    setAnalysisError("");
+    try {
+      const result = await postJson<MaterialAnalysis>(
+        "/api/ai/analyze-materials",
+        { roomImageUrl, styleImageUrl, detailImageUrl },
+      );
+      setImageAnalysis(result);
+      setPrompt(result.templatePrompt);
+      setOptimizedPrompt("");
+      setNegativePrompt("");
+      setActiveStep(1);
+    } catch (error) {
+      setAnalysisError(
+        error instanceof Error ? error.message : "图片识别失败，请重试",
       );
     } finally {
       setBusyAction(null);
@@ -200,10 +248,12 @@ export default function WorkbenchPage() {
         "/api/ai/generate-image",
         {
           roomImageUrl,
-          sampleImageUrl,
+          styleImageUrl,
+          detailImageUrl,
           optimizedPrompt: optimizedPrompt || prompt,
           negativePrompt,
           fidelity,
+          imageAnalysis: imageAnalysis ? JSON.stringify(imageAnalysis) : "",
           referenceImageUrl,
         },
       );
@@ -222,7 +272,9 @@ export default function WorkbenchPage() {
         socialCopy: string;
         customerScript: string;
       }>("/api/ai/generate-marketing", {
-        materialSummary,
+        materialSummary: imageAnalysis
+          ? `${imageAnalysis.styleSummary}；${imageAnalysis.materialSummary}`
+          : materialSummary,
         roomSummary: optimizedPrompt || prompt,
         effectImageUrl: imageUrl || roomImageUrl,
         customerNotes: "王女士客厅窗帘方案",
@@ -242,7 +294,10 @@ export default function WorkbenchPage() {
         customerName: "王女士",
         notes: "客厅窗帘方案",
         roomImageUrl,
-        sampleImageUrl,
+        sampleImageUrl: styleImageUrl,
+        styleImageUrl,
+        detailImageUrl,
+        imageAnalysis: imageAnalysis ? JSON.stringify(imageAnalysis) : "{}",
         originalPrompt: roomPrompt,
         optimizedPrompt: optimizedPrompt || prompt,
         negativePrompt,
@@ -270,13 +325,21 @@ export default function WorkbenchPage() {
               <PageWrapper id="editor">
                 <EditorView
                   roomImageUrl={roomImageUrl}
-                  sampleImageUrl={sampleImageUrl}
+                  styleImageUrl={styleImageUrl}
+                  detailImageUrl={detailImageUrl}
+                  imageAnalysis={imageAnalysis}
                   busyAction={busyAction}
                   uploadError={uploadError}
+                  analysisError={analysisError}
                   onBack={() => undefined}
                   onNext={() => setActiveStep(1)}
                   onUploadRoom={(file) => uploadImage(file, "room")}
-                  onUploadSample={(file) => uploadImage(file, "sample")}
+                  onUploadStyle={(file) => uploadImage(file, "style")}
+                  onUploadDetail={(file) => uploadImage(file, "detail")}
+                  onRemoveRoom={() => removeImage("room")}
+                  onRemoveStyle={() => removeImage("style")}
+                  onRemoveDetail={() => removeImage("detail")}
+                  onAnalyze={analyzeUploadedImages}
                 />
               </PageWrapper>
             ) : null}
@@ -416,27 +479,48 @@ function StudioHeader({
 
 function EditorView({
   roomImageUrl,
-  sampleImageUrl,
+  styleImageUrl,
+  detailImageUrl,
+  imageAnalysis,
   busyAction,
   uploadError,
+  analysisError,
   onBack,
   onNext,
   onUploadRoom,
-  onUploadSample,
+  onUploadStyle,
+  onUploadDetail,
+  onRemoveRoom,
+  onRemoveStyle,
+  onRemoveDetail,
+  onAnalyze,
 }: {
   roomImageUrl: string;
-  sampleImageUrl: string;
+  styleImageUrl: string;
+  detailImageUrl: string;
+  imageAnalysis: MaterialAnalysis | null;
   busyAction: string | null;
   uploadError: string;
+  analysisError: string;
   onBack: () => void;
   onNext: () => void;
   onUploadRoom: (file: File) => void;
-  onUploadSample: (file: File) => void;
+  onUploadStyle: (file: File) => void;
+  onUploadDetail: (file: File) => void;
+  onRemoveRoom: () => void;
+  onRemoveStyle: () => void;
+  onRemoveDetail: () => void;
+  onAnalyze: () => void;
 }) {
   const roomFileInputRef = useRef<HTMLInputElement>(null);
-  const sampleFileInputRef = useRef<HTMLInputElement>(null);
+  const styleFileInputRef = useRef<HTMLInputElement>(null);
+  const detailFileInputRef = useRef<HTMLInputElement>(null);
   const roomUploading = busyAction === "upload-room";
-  const sampleUploading = busyAction === "upload-sample";
+  const styleUploading = busyAction === "upload-style";
+  const detailUploading = busyAction === "upload-detail";
+  const analysisReady = Boolean(
+    roomImageUrl && styleImageUrl && detailImageUrl,
+  );
 
   return (
     <div className="relative flex h-full flex-col">
@@ -483,11 +567,27 @@ function EditorView({
 
           <div className="rounded-[24px] border border-white bg-white p-2 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)]">
             <div className="group relative aspect-[4/3] overflow-hidden rounded-[16px] bg-stone-50">
-              <img
-                src={roomImageUrl}
-                alt="客户空间"
-                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
+              {roomImageUrl ? (
+                <img
+                  src={roomImageUrl}
+                  alt="客户空间"
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-[12px] text-stone-400">
+                  请选择客户空间图片
+                </div>
+              )}
+              {roomImageUrl ? (
+                <button
+                  type="button"
+                  aria-label="删除客户空间图片"
+                  onClick={onRemoveRoom}
+                  className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"
+                >
+                  <X size={15} />
+                </button>
+              ) : null}
               <div className="absolute inset-x-0 bottom-0 flex items-end justify-between bg-gradient-to-t from-black/40 to-transparent p-4">
                 <div className="rounded-full border border-white/20 bg-white/20 px-2.5 py-1 text-[10px] tracking-wider text-white backdrop-blur-md">
                   原图
@@ -514,7 +614,11 @@ function EditorView({
                 className="flex flex-1 items-center justify-center gap-2 text-[12px] font-medium tracking-wide text-stone-500 transition-colors hover:text-sage"
               >
                 <UploadCloud size={14} strokeWidth={2} />
-                {roomUploading ? "上传中..." : "重新上传"}
+                {roomUploading
+                  ? "上传中..."
+                  : roomImageUrl
+                    ? "重新上传"
+                    : "上传图片"}
               </button>
               <button
                 type="button"
@@ -540,45 +644,55 @@ function EditorView({
               材质样本
             </h2>
             <span className="text-[11px] tracking-wide text-stone-400">
-              已选 1 项
+              已选 {[styleImageUrl, detailImageUrl].filter(Boolean).length} / 2
             </span>
           </div>
 
-          <div className="hide-scrollbar -mx-2 flex gap-4 overflow-x-auto px-2 pb-6 pt-2">
-            <motion.div
-              whileHover={{ y: -4, rotate: 2 }}
-              className="group relative h-28 w-24 flex-shrink-0 overflow-hidden rounded-2xl border-[3px] border-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.15)]"
-            >
-              <img
-                src={sampleImageUrl}
-                alt="已选材质样本"
-                className="h-full w-full object-cover"
-              />
-              <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5" />
-            </motion.div>
+          <div className="grid grid-cols-2 gap-4 px-2 pb-4">
+            <MaterialReferenceCard
+              title="整体款式"
+              description="造型、层次与配色"
+              imageUrl={styleImageUrl}
+              imageAlt="整体款式参考"
+              uploading={styleUploading}
+              onChoose={() => styleFileInputRef.current?.click()}
+              onRemove={onRemoveStyle}
+              removeLabel="删除整体款式图片"
+            />
+            <MaterialReferenceCard
+              title="材质细节"
+              description="纹理、厚度与垂感"
+              imageUrl={detailImageUrl}
+              imageAlt="材质细节参考"
+              uploading={detailUploading}
+              onChoose={() => detailFileInputRef.current?.click()}
+              onRemove={onRemoveDetail}
+              removeLabel="删除材质细节图片"
+            />
             <input
-              ref={sampleFileInputRef}
+              ref={styleFileInputRef}
               type="file"
               accept="image/*"
-              aria-label="上传材质样本图片"
+              aria-label="上传整体款式图片"
               className="sr-only"
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
-                if (file) onUploadSample(file);
+                if (file) onUploadStyle(file);
                 event.currentTarget.value = "";
               }}
             />
-            <button
-              type="button"
-              onClick={() => sampleFileInputRef.current?.click()}
-              disabled={sampleUploading}
-              className="flex h-28 w-24 flex-shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 text-stone-400 transition-all hover:border-sage/30 hover:bg-white hover:text-sage"
-            >
-              <Plus size={20} strokeWidth={1.5} />
-              <span className="text-[10px] font-medium tracking-wider">
-                {sampleUploading ? "上传中..." : "添加"}
-              </span>
-            </button>
+            <input
+              ref={detailFileInputRef}
+              type="file"
+              accept="image/*"
+              aria-label="上传材质细节图片"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) onUploadDetail(file);
+                event.currentTarget.value = "";
+              }}
+            />
           </div>
         </motion.section>
 
@@ -587,6 +701,26 @@ function EditorView({
             {uploadError}
           </p>
         ) : null}
+
+        {analysisError ? (
+          <p role="alert" className="mb-6 px-2 text-[12px] text-red-600">
+            {analysisError}
+          </p>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={onAnalyze}
+          disabled={!analysisReady || busyAction !== null}
+          className="mb-8 flex w-full items-center justify-center gap-2 rounded-2xl border border-sage/15 bg-white px-4 py-4 text-[13px] font-medium tracking-wide text-sage shadow-sm transition-all hover:border-sage/30 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Wand2 size={16} />
+          {busyAction === "analyze"
+            ? "正在识别房间与材质..."
+            : imageAnalysis
+              ? "重新识别并生成文案"
+              : "AI 识别并生成文案"}
+        </button>
 
         <motion.section
           initial={{ opacity: 0, y: 10 }}
@@ -623,6 +757,67 @@ function EditorView({
             <MoveRight size={16} strokeWidth={1.5} />
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MaterialReferenceCard({
+  title,
+  description,
+  imageUrl,
+  imageAlt,
+  uploading,
+  onChoose,
+  onRemove,
+  removeLabel,
+}: {
+  title: string;
+  description: string;
+  imageUrl: string;
+  imageAlt: string;
+  uploading: boolean;
+  onChoose: () => void;
+  onRemove: () => void;
+  removeLabel: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white bg-white p-2 shadow-sm">
+      <div className="relative aspect-square overflow-hidden rounded-xl bg-stone-50">
+        {imageUrl ? (
+          <img src={imageUrl} alt={imageAlt} className="h-full w-full object-cover" />
+        ) : (
+          <button
+            type="button"
+            onClick={onChoose}
+            className="flex h-full w-full flex-col items-center justify-center gap-2 text-stone-400"
+          >
+            <Plus size={20} />
+            <span className="text-[10px]">添加图片</span>
+          </button>
+        )}
+        {imageUrl ? (
+          <button
+            type="button"
+            aria-label={removeLabel}
+            onClick={onRemove}
+            className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"
+          >
+            <X size={13} />
+          </button>
+        ) : null}
+      </div>
+      <div className="px-1 pb-1 pt-2">
+        <div className="text-[12px] font-medium text-stone-700">{title}</div>
+        <div className="mt-0.5 text-[9px] text-stone-400">{description}</div>
+        <button
+          type="button"
+          onClick={onChoose}
+          disabled={uploading}
+          className="mt-2 text-[10px] font-medium text-sage disabled:opacity-50"
+        >
+          {uploading ? "上传中..." : imageUrl ? "更换图片" : "选择图片"}
+        </button>
       </div>
     </div>
   );

@@ -27,7 +27,9 @@ type BailianImageResponse = {
   };
 };
 
-export function getBailianConfig(env: NodeJS.ProcessEnv = process.env) {
+export function getBailianConfig(
+  env: Record<string, string | undefined> = process.env,
+) {
   return {
     apiKey: env.DASHSCOPE_API_KEY,
     textModel: env.DASHSCOPE_TEXT_MODEL ?? "qwen3.7-flash",

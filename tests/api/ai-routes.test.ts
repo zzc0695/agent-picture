@@ -70,7 +70,8 @@ describe("AI API routes", () => {
     const response = await generateImagePost(
       jsonRequest("http://localhost/api/ai/generate-image", {
         roomImageUrl: "/uploads/room.jpg",
-        sampleImageUrl: "/uploads/sample.jpg",
+        styleImageUrl: "/uploads/style.jpg",
+        detailImageUrl: "/uploads/detail.jpg",
         optimizedPrompt: "客厅窗帘",
         negativePrompt: "",
         fidelity: "exact",

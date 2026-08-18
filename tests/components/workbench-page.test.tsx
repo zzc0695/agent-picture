@@ -21,6 +21,15 @@ function mockApiResponses() {
       });
     }
 
+    if (url.endsWith("/api/ai/analyze-materials")) {
+      return Response.json({
+        roomSummary: "明亮的现代客厅，大面积落地窗",
+        styleSummary: "米白双层落地帘，简约褶皱",
+        materialSummary: "细密哑光遮光布搭配白纱",
+        templatePrompt: "识别生成的米白双层窗帘模板文案",
+      });
+    }
+
     if (url.endsWith("/api/ai/generate-image")) {
       return Response.json({
         imageUrl: "/uploads/generated-effect.png",
@@ -128,7 +137,7 @@ describe("WorkbenchPage", () => {
     );
   });
 
-  it("uploads room and sample images and uses them for generation", async () => {
+  it("uploads three image roles, analyzes them, and uses them for generation", async () => {
     const user = userEvent.setup();
     const fetchMock = mockApiResponses();
 
@@ -144,15 +153,44 @@ describe("WorkbenchPage", () => {
     );
 
     await user.upload(
-      screen.getByLabelText("上传材质样本图片"),
-      new File(["sample"], "sample.png", { type: "image/png" }),
+      screen.getByLabelText("上传整体款式图片"),
+      new File(["style"], "style.png", { type: "image/png" }),
     );
-    expect(await screen.findByAltText("已选材质样本")).toHaveAttribute(
+    expect(await screen.findByAltText("整体款式参考")).toHaveAttribute(
       "src",
-      "https://blob.test/sample.png",
+      "https://blob.test/style.png",
     );
 
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "删除材质细节图片" }));
+    expect(
+      screen.getByRole("button", { name: "AI 识别并生成文案" }),
+    ).toBeDisabled();
+
+    await user.upload(
+      screen.getByLabelText("上传材质细节图片"),
+      new File(["detail"], "detail.png", { type: "image/png" }),
+    );
+    expect(await screen.findByAltText("材质细节参考")).toHaveAttribute(
+      "src",
+      "https://blob.test/detail.png",
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "AI 识别并生成文案" }),
+    );
+    expect(
+      await screen.findByDisplayValue("识别生成的米白双层窗帘模板文案"),
+    ).toBeInTheDocument();
+
+    const analysisCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/api/ai/analyze-materials"),
+    );
+    expect(JSON.parse(String(analysisCall?.[1]?.body))).toEqual({
+      roomImageUrl: "https://blob.test/room.png",
+      styleImageUrl: "https://blob.test/style.png",
+      detailImageUrl: "https://blob.test/detail.png",
+    });
+
     await user.click(screen.getByRole("button", { name: "生成方案效果" }));
     expect(await screen.findByText("效果呈现")).toBeInTheDocument();
 
@@ -162,7 +200,21 @@ describe("WorkbenchPage", () => {
     expect(JSON.parse(String(generationCall?.[1]?.body))).toEqual(
       expect.objectContaining({
         roomImageUrl: "https://blob.test/room.png",
-        sampleImageUrl: "https://blob.test/sample.png",
+        styleImageUrl: "https://blob.test/style.png",
+        detailImageUrl: "https://blob.test/detail.png",
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "进入方案展示" }));
+    const saveCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/api/plans"),
+    );
+    expect(JSON.parse(String(saveCall?.[1]?.body))).toEqual(
+      expect.objectContaining({
+        sampleImageUrl: "https://blob.test/style.png",
+        styleImageUrl: "https://blob.test/style.png",
+        detailImageUrl: "https://blob.test/detail.png",
+        imageAnalysis: expect.stringContaining("明亮的现代客厅"),
       }),
     );
   });

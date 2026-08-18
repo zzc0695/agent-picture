@@ -1,4 +1,4 @@
-export function getDatabaseUrl(env: NodeJS.ProcessEnv): string {
+export function getDatabaseUrl(env: Record<string, string | undefined>): string {
   const databaseUrl = env.DATABASE_URL ?? env.STORAGE_URL;
 
   if (!databaseUrl) {
