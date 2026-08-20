@@ -4,9 +4,11 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowRight,
+  CheckCircle2,
   ChevronLeft,
   Copy,
   Download,
@@ -14,6 +16,7 @@ import {
   Image as ImageIcon,
   LayoutGrid,
   LayoutTemplate,
+  Maximize2,
   MoreHorizontal,
   MoveRight,
   Plus,
@@ -28,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { ImageViewer } from "@/components/image-viewer";
 
 const customerName = "王女士";
 const planName = "客厅";
@@ -103,15 +107,14 @@ type MaterialAnalysis = {
 const pageEase = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 const pageTransition = {
-  initial: { opacity: 0, y: 15, filter: "blur(4px)" },
-  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
   exit: {
     opacity: 0,
-    y: -15,
-    filter: "blur(4px)",
-    transition: { duration: 0.2 },
+    y: -8,
+    transition: { duration: 0.12 },
   },
-  transition: { duration: 0.5, ease: pageEase },
+  transition: { duration: 0.2, ease: pageEase },
 };
 
 export default function WorkbenchPage() {
@@ -131,6 +134,11 @@ export default function WorkbenchPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [analysisError, setAnalysisError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [savedPlanId, setSavedPlanId] = useState("");
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
   const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
   const frameRef = useRef<HTMLDivElement>(null);
@@ -148,15 +156,20 @@ export default function WorkbenchPage() {
       body: JSON.stringify(body),
     });
 
+    const result = (await response.json().catch(() => ({}))) as T & {
+      error?: string;
+    };
+
     if (!response.ok) {
-      throw new Error(`Request failed: ${url}`);
+      throw new Error(result.error || "请求失败，请稍后重试");
     }
 
-    return response.json() as Promise<T>;
+    return result;
   }
 
   async function optimizePrompt() {
     setBusyAction("optimize");
+    setActionError("");
     try {
       const result = await postJson<{
         optimizedPrompt: string;
@@ -171,6 +184,10 @@ export default function WorkbenchPage() {
       setPrompt(result.optimizedPrompt);
       setOptimizedPrompt(result.optimizedPrompt);
       setNegativePrompt(result.negativePrompt);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "AI 润色失败，请重试",
+      );
     } finally {
       setBusyAction(null);
     }
@@ -243,6 +260,7 @@ export default function WorkbenchPage() {
 
   async function generateImage(referenceImageUrl?: string) {
     setBusyAction("generate");
+    setActionError("");
     try {
       const result = await postJson<{ imageUrl: string; inputSummary: string }>(
         "/api/ai/generate-image",
@@ -259,6 +277,10 @@ export default function WorkbenchPage() {
       );
       setImageUrl(result.imageUrl);
       setActiveStep(2);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "效果图生成失败，请重试",
+      );
     } finally {
       setBusyAction(null);
     }
@@ -266,6 +288,7 @@ export default function WorkbenchPage() {
 
   async function generateMarketing() {
     setBusyAction("marketing");
+    setActionError("");
     try {
       const result = await postJson<{
         shortVideoScript: string;
@@ -282,6 +305,10 @@ export default function WorkbenchPage() {
       setShortVideoScript(result.shortVideoScript);
       setSocialCopy(result.socialCopy);
       setCustomerScript(result.customerScript);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "营销文案生成失败，请重试",
+      );
     } finally {
       setBusyAction(null);
     }
@@ -289,8 +316,10 @@ export default function WorkbenchPage() {
 
   async function savePlan() {
     setBusyAction("save");
+    setActionError("");
+    setActionNotice("");
     try {
-      await postJson("/api/plans", {
+      const result = await postJson<{ plan: { id: string } }>("/api/plans", {
         customerName: "王女士",
         notes: "客厅窗帘方案",
         roomImageUrl,
@@ -309,10 +338,55 @@ export default function WorkbenchPage() {
         status: "ready",
         materialIds: [],
       });
+      setSavedPlanId(result.plan.id);
+      setActionNotice("方案已保存");
       setCustomerTab("effect");
       setActiveStep(3);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "方案保存失败，请重试",
+      );
     } finally {
       setBusyAction(null);
+    }
+  }
+
+  async function downloadImage() {
+    if (!imageUrl || downloading) return;
+
+    setDownloading(true);
+    setActionError("");
+    setActionNotice("");
+    try {
+      const response = await fetch(
+        `/api/files/download?url=${encodeURIComponent(imageUrl)}`,
+      );
+      if (!response.ok) {
+        const result = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(result.error || "高清图片下载失败");
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const fileName =
+        disposition.match(/filename="([^"]+)"/)?.[1] ?? "curtain-plan.png";
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = fileName;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      setActionNotice("高清图已开始下载");
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "高清图片下载失败",
+      );
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -366,10 +440,15 @@ export default function WorkbenchPage() {
                   socialCopy={socialCopy}
                   customerScript={customerScript}
                   busyAction={busyAction}
+                  downloading={downloading}
+                  actionNotice={actionNotice}
+                  actionError={actionError}
                   onBack={() => setActiveStep(1)}
                   onSimilar={() => generateImage(imageUrl)}
                   onMarketing={generateMarketing}
                   onNext={savePlan}
+                  onDownload={downloadImage}
+                  onOpenViewer={() => setViewerOpen(true)}
                 />
               </PageWrapper>
             ) : null}
@@ -381,8 +460,14 @@ export default function WorkbenchPage() {
                   imageUrl={imageUrl}
                   socialCopy={socialCopy}
                   customerScript={customerScript}
+                  actionNotice={actionNotice}
+                  actionError={actionError}
+                  savedPlanId={savedPlanId}
+                  downloading={downloading}
                   onBack={() => setActiveStep(2)}
                   onCustomerTabChange={setCustomerTab}
+                  onDownload={downloadImage}
+                  onOpenViewer={() => setViewerOpen(true)}
                 />
               </PageWrapper>
             ) : null}
@@ -403,6 +488,13 @@ export default function WorkbenchPage() {
               }}
             />
           ) : null}
+          <ImageViewer
+            imageUrl={isRenderableImageUrl(imageUrl) ? imageUrl : IMAGES.result}
+            open={viewerOpen}
+            onClose={() => setViewerOpen(false)}
+            onDownload={downloadImage}
+            downloading={downloading}
+          />
         </div>
       </div>
     </div>
@@ -984,20 +1076,30 @@ function ResultView({
   socialCopy,
   customerScript,
   busyAction,
+  downloading,
+  actionNotice,
+  actionError,
   onBack,
   onSimilar,
   onMarketing,
   onNext,
+  onDownload,
+  onOpenViewer,
 }: {
   imageUrl: string;
   shortVideoScript: string;
   socialCopy: string;
   customerScript: string;
   busyAction: string | null;
+  downloading: boolean;
+  actionNotice: string;
+  actionError: string;
   onBack: () => void;
   onSimilar: () => void;
   onMarketing: () => void;
   onNext: () => void;
+  onDownload: () => void;
+  onOpenViewer: () => void;
 }) {
   const displayImage = isRenderableImageUrl(imageUrl) ? imageUrl : IMAGES.result;
 
@@ -1006,7 +1108,7 @@ function ResultView({
       <motion.div
         initial={{ scale: 1.05, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        transition={{ duration: 0.24, ease: "easeOut" }}
         className="absolute inset-0 z-0 bg-stone-900"
       >
         <img
@@ -1033,6 +1135,15 @@ function ResultView({
           </button>
         }
       />
+
+      <button
+        type="button"
+        aria-label="放大查看效果图"
+        onClick={onOpenViewer}
+        className="absolute right-4 top-[82px] z-20 grid size-11 place-items-center rounded-full border border-white/20 bg-black/45 text-white shadow-lg backdrop-blur-md transition-colors hover:bg-black/65"
+      >
+        <Maximize2 size={18} aria-hidden="true" />
+      </button>
 
       <div className="z-10 flex flex-1 flex-col justify-end p-6 pb-8">
         <motion.div
@@ -1072,22 +1183,44 @@ function ResultView({
             </div>
           ) : null}
 
-          <div className="mb-4 grid grid-cols-3 gap-3">
+          {actionError ? (
+            <div
+              role="alert"
+              className="mb-4 rounded-2xl border border-red-300/30 bg-red-950/55 px-4 py-3 text-[12px] leading-5 text-red-100 backdrop-blur-md"
+            >
+              {actionError}
+            </div>
+          ) : null}
+          {actionNotice ? (
+            <div
+              role="status"
+              className="mb-4 flex items-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-[12px] text-white backdrop-blur-md"
+            >
+              <CheckCircle2 size={16} className="text-white" aria-hidden="true" />
+              {actionNotice}
+            </div>
+          ) : null}
+
+          <div className="mb-4 grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={onNext}
               disabled={busyAction === "save"}
-              className="col-span-2 flex items-center justify-center gap-2 rounded-[20px] bg-white py-4 text-[13px] font-medium tracking-widest text-stone-900 shadow-xl transition-colors hover:bg-stone-100"
+              className="flex items-center justify-center gap-2 rounded-[20px] bg-white py-4 text-[13px] font-medium tracking-widest text-stone-900 shadow-xl transition-colors hover:bg-stone-100 disabled:opacity-60"
             >
               <Share2 size={16} strokeWidth={1.5} />
-              {busyAction === "save" ? "保存中" : "进入方案展示"}
+              {busyAction === "save" ? "保存中" : "保存方案"}
             </button>
             <button
               type="button"
-              aria-label="下载效果图"
-              className="flex items-center justify-center rounded-[20px] border border-white/20 bg-white/10 py-4 text-white backdrop-blur-xl transition-colors hover:bg-white/20"
+              onClick={onDownload}
+              disabled={downloading}
+              className="flex items-center justify-center gap-2 rounded-[20px] border border-white/20 bg-white/10 px-3 py-4 text-white backdrop-blur-xl transition-colors hover:bg-white/20 disabled:opacity-60"
             >
               <Download size={18} strokeWidth={1.5} />
+              <span className="text-[11px] font-medium tracking-wide">
+                {downloading ? "下载中" : "下载高清图"}
+              </span>
             </button>
           </div>
 
@@ -1127,16 +1260,28 @@ function DisplayView({
   imageUrl,
   socialCopy,
   customerScript,
+  actionNotice,
+  actionError,
+  savedPlanId,
+  downloading,
   onBack,
   onCustomerTabChange,
+  onDownload,
+  onOpenViewer,
 }: {
   customerTab: CustomerTab;
   fidelity: Fidelity;
   imageUrl: string;
   socialCopy: string;
   customerScript: string;
+  actionNotice: string;
+  actionError: string;
+  savedPlanId: string;
+  downloading: boolean;
   onBack: () => void;
   onCustomerTabChange: (tab: CustomerTab) => void;
+  onDownload: () => void;
+  onOpenViewer: () => void;
 }) {
   const fidelityLabel =
     fidelityOptions.find(([value]) => value === fidelity)?.[1] ?? "平衡";
@@ -1183,6 +1328,32 @@ function DisplayView({
           </button>
         </div>
       </div>
+
+      {actionNotice ? (
+        <div
+          role="status"
+          data-plan-id={savedPlanId || undefined}
+          className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-2xl border border-sage/15 bg-white/72 px-4 py-3 text-[12px] text-stone-700 shadow-sm"
+        >
+          <span className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-sage" aria-hidden="true" />
+            {actionNotice}
+          </span>
+          {savedPlanId && actionNotice === "方案已保存" ? (
+            <Link href="/plans" className="font-semibold text-sage underline-offset-4 hover:underline">
+              查看客户方案
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+      {actionError ? (
+        <div
+          role="alert"
+          className="mx-4 mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700"
+        >
+          {actionError}
+        </div>
+      ) : null}
 
       <div className="hide-scrollbar flex-1 overflow-y-auto px-4 pb-32 pt-4">
         {customerTab === "details" ? (
@@ -1232,6 +1403,15 @@ function DisplayView({
                 />
               </div>
 
+              <button
+                type="button"
+                aria-label="放大查看效果图"
+                onClick={onOpenViewer}
+                className="absolute right-3 top-3 grid size-11 place-items-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-md transition-colors hover:bg-black/70"
+              >
+                <Maximize2 size={18} aria-hidden="true" />
+              </button>
+
               <div className="absolute -bottom-4 right-6 flex flex-col items-center rounded-full border-2 border-white bg-sage px-5 py-2.5 text-white shadow-lg">
                 <span className="mb-0.5 text-[10px] tracking-widest opacity-80">
                   风格特征
@@ -1255,13 +1435,24 @@ function DisplayView({
       </div>
 
       <div className="studio-action-bar">
-        <button
-          type="button"
-          className="studio-primary-button flex w-full items-center justify-center gap-2"
-        >
-          发送给客户
-          <ArrowRight size={16} strokeWidth={1.5} />
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onDownload}
+            disabled={downloading}
+            className="studio-secondary-button flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            <Download size={16} aria-hidden="true" />
+            {downloading ? "下载中" : "下载高清图"}
+          </button>
+          <button
+            type="button"
+            className="studio-primary-button flex items-center justify-center gap-2"
+          >
+            发送给客户
+            <ArrowRight size={16} strokeWidth={1.5} />
+          </button>
+        </div>
       </div>
     </div>
   );

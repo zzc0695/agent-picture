@@ -32,6 +32,10 @@ body {
   font-family: var(--font-sans);
 }
 
+button {
+  touch-action: manipulation;
+}
+
 button,
 textarea,
 input {
@@ -178,11 +182,23 @@ button:disabled {
 .studio-icon-button {
   min-height: 48px;
   border: 0;
+  touch-action: manipulation;
   transition:
     transform 150ms ease,
     background 150ms ease,
     color 150ms ease,
     border-color 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .studio-primary-button:active,

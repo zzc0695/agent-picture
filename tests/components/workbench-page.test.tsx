@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import WorkbenchPage from "@/app/(dashboard)/page";
 import { ResultPanel } from "@/components/result-panel";
 
-function mockApiResponses() {
+function mockApiResponses(options: { planError?: string } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
 
@@ -46,10 +46,24 @@ function mockApiResponses() {
     }
 
     if (url.endsWith("/api/plans")) {
+      if (options.planError) {
+        return Response.json({ error: options.planError }, { status: 500 });
+      }
       return Response.json(
         { plan: { id: "plan_1", customerName: "王女士" } },
         { status: 201 },
       );
+    }
+
+    if (url.startsWith("/api/files/download?")) {
+      return new Response(new Blob(["image"], { type: "image/png" }), {
+        status: 200,
+        headers: {
+          "content-type": "image/png",
+          "content-disposition":
+            'attachment; filename="curtain-plan-20260820.png"',
+        },
+      });
     }
 
     return Response.json({}, { status: 404 });
@@ -62,6 +76,17 @@ function mockApiResponses() {
 describe("WorkbenchPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:effect-download"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      () => undefined,
+    );
   });
 
   it("renders the AI studio proposal flow from the new design reference", async () => {
@@ -91,8 +116,12 @@ describe("WorkbenchPage", () => {
     expect(screen.getByText("效果呈现")).toBeInTheDocument();
     expect(screen.getByText("渲染方案 01")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "进入方案展示" }));
+    await user.click(screen.getByRole("button", { name: "保存方案" }));
     expect(screen.getByText("方案展示")).toBeInTheDocument();
+    expect(screen.getByText("方案已保存")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "查看客户方案" }),
+    ).toHaveAttribute("href", "/plans");
     expect(screen.getByText("社交分享方案")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "发送给客户" }),
@@ -115,7 +144,7 @@ describe("WorkbenchPage", () => {
     await user.click(screen.getByRole("button", { name: "生成营销文案" }));
     expect(await screen.findByText("接口返回的朋友圈文案")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "进入方案展示" }));
+    await user.click(screen.getByRole("button", { name: "保存方案" }));
     expect(await screen.findByText("方案展示")).toBeInTheDocument();
     expect(screen.getByText("接口返回的客户沟通话术")).toBeInTheDocument();
 
@@ -205,7 +234,7 @@ describe("WorkbenchPage", () => {
       }),
     );
 
-    await user.click(screen.getByRole("button", { name: "进入方案展示" }));
+    await user.click(screen.getByRole("button", { name: "保存方案" }));
     const saveCall = fetchMock.mock.calls.find(([input]) =>
       String(input).endsWith("/api/plans"),
     );
@@ -251,7 +280,7 @@ describe("WorkbenchPage", () => {
 
     await user.click(screen.getByRole("button", { name: "进入下一步" }));
     await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    await user.click(await screen.findByRole("button", { name: "进入方案展示" }));
+    await user.click(await screen.findByRole("button", { name: "保存方案" }));
 
     expect(await screen.findByText("方案展示")).toBeInTheDocument();
     expect(screen.getByText("社交分享方案")).toBeInTheDocument();
@@ -265,6 +294,50 @@ describe("WorkbenchPage", () => {
     await user.click(screen.getByRole("button", { name: "展示效果" }));
 
     expect(screen.getByText("社交分享方案")).toBeInTheDocument();
+  });
+
+  it("opens the effect detail viewer and downloads the real image", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockApiResponses();
+
+    render(<WorkbenchPage />);
+
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "放大查看效果图" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "查看效果图细节" }),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "关闭图片查看器" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "下载高清图" }));
+    expect(await screen.findByText("高清图已开始下载")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/files/download?url=%2Fuploads%2Fgenerated-effect.png",
+    );
+    expect(URL.createObjectURL).toHaveBeenCalled();
+  });
+
+  it("shows the backend error when saving a plan fails", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({ planError: "数据库暂时不可用" });
+
+    render(<WorkbenchPage />);
+
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    await user.click(await screen.findByRole("button", { name: "保存方案" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "数据库暂时不可用",
+    );
+    expect(screen.getByText("效果呈现")).toBeInTheDocument();
   });
 });
 
