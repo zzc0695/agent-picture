@@ -3,6 +3,20 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { put } from "@vercel/blob";
 
+const MAX_BAILIAN_IMAGE_BYTES = 7 * 1024 * 1024;
+const BAILIAN_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+export class MaterialImageInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MaterialImageInputError";
+  }
+}
+
 function storageRoot() {
   return process.env.LOCAL_FILE_ROOT ?? "./storage";
 }
@@ -118,7 +132,64 @@ async function readPublicImage(imageUrl: string) {
   }
 }
 
+function validatedImageDataUrl(bytes: Buffer, contentType: string) {
+  const normalizedType = contentType.toLowerCase().split(";", 1)[0].trim();
+
+  if (!BAILIAN_IMAGE_TYPES.has(normalizedType)) {
+    throw new MaterialImageInputError(
+      "图片格式不支持，请使用 JPG、PNG 或 WebP",
+    );
+  }
+
+  if (bytes.byteLength > MAX_BAILIAN_IMAGE_BYTES) {
+    throw new MaterialImageInputError("单张图片不能超过 7MB");
+  }
+
+  return `data:${normalizedType};base64,${bytes.toString("base64")}`;
+}
+
+function isVercelBlobUrl(imageUrl: string) {
+  try {
+    const url = new URL(imageUrl);
+    return (
+      url.protocol === "https:" &&
+      url.hostname.endsWith(".blob.vercel-storage.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function readVercelBlobImage(imageUrl: string) {
+  let response: Response;
+
+  try {
+    response = await fetch(imageUrl, { cache: "no-store" });
+  } catch {
+    throw new MaterialImageInputError("参考图片读取失败，请稍后重试");
+  }
+
+  if (!response.ok) {
+    throw new MaterialImageInputError("参考图片读取失败，请稍后重试");
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const declaredSize = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredSize) && declaredSize > MAX_BAILIAN_IMAGE_BYTES) {
+    throw new MaterialImageInputError("单张图片不能超过 7MB");
+  }
+
+  return validatedImageDataUrl(
+    Buffer.from(await response.arrayBuffer()),
+    contentType,
+  );
+}
+
 export async function toBailianImageReference(imageUrl: string) {
+  if (isVercelBlobUrl(imageUrl)) {
+    return readVercelBlobImage(imageUrl);
+  }
+
   if (/^https?:\/\//i.test(imageUrl) || imageUrl.startsWith("data:image/")) {
     return imageUrl;
   }
@@ -132,5 +203,5 @@ export async function toBailianImageReference(imageUrl: string) {
     throw new Error("无法读取用于图片生成的参考图");
   }
 
-  return "data:" + image.contentType + ";base64," + image.bytes.toString("base64");
+  return validatedImageDataUrl(image.bytes, image.contentType);
 }

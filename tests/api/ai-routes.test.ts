@@ -6,6 +6,7 @@ import { analyzeMaterials } from "@/lib/ai/material-analysis";
 import { generateEffectImage } from "@/lib/ai/image";
 import { optimizePrompt } from "@/lib/ai/prompt";
 import { db } from "@/lib/db";
+import { MaterialImageInputError } from "@/lib/files/storage";
 
 vi.mock("@/lib/auth/require-session", () => ({
   requireMerchantSession: vi.fn(async () => ({
@@ -124,5 +125,57 @@ describe("AI API routes", () => {
 
     expect(response.status).toBe(400);
     expect(analyzeMaterials).not.toHaveBeenCalled();
+  });
+
+  it("returns a safe input error when a material image cannot be accepted", async () => {
+    vi.mocked(analyzeMaterials).mockRejectedValue(
+      new MaterialImageInputError("单张图片不能超过 7MB"),
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await analyzeMaterialsPost(
+      jsonRequest("http://localhost/api/ai/analyze-materials", {
+        roomImageUrl: "/uploads/room.jpg",
+        styleImageUrl: "/uploads/style.jpg",
+        detailImageUrl: "/uploads/detail.jpg",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "单张图片不能超过 7MB",
+    });
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"material_analysis_failed"'),
+    );
+    expect(db.generationRecord.create).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it("returns a safe provider error without exposing upstream details", async () => {
+    vi.mocked(analyzeMaterials).mockRejectedValue(
+      new Error("401 invalid api key sk-secret"),
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await analyzeMaterialsPost(
+      jsonRequest("http://localhost/api/ai/analyze-materials", {
+        roomImageUrl: "/uploads/room.jpg",
+        styleImageUrl: "/uploads/style.jpg",
+        detailImageUrl: "/uploads/detail.jpg",
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    const body = await response.json();
+    expect(body).toEqual({ error: "AI 图片识别暂时失败，请稍后重试" });
+    expect(JSON.stringify(body)).not.toContain("sk-secret");
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"material_analysis_failed"'),
+    );
+    expect(String(log.mock.calls[0]?.[0])).not.toContain("sk-secret");
+    expect(String(log.mock.calls[0]?.[0])).toContain("[redacted-key]");
+    expect(db.generationRecord.create).not.toHaveBeenCalled();
+    log.mockRestore();
   });
 });

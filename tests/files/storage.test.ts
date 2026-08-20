@@ -15,6 +15,7 @@ describe("file storage", () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllGlobals();
     await rm(testRoot, { recursive: true, force: true });
     delete process.env.LOCAL_FILE_ROOT;
     delete process.env.BLOB_READ_WRITE_TOKEN;
@@ -94,7 +95,7 @@ describe("file storage", () => {
     await expect(readStoredUpload("../secret.png")).resolves.toBeNull();
   });
 
-  it("keeps public URLs and converts local uploads to data URLs", async () => {
+  it("keeps non-Blob public URLs and converts local uploads to data URLs", async () => {
     const { saveGeneratedImage, toBailianImageReference } = await import(
       "@/lib/files/storage"
     );
@@ -106,5 +107,66 @@ describe("file storage", () => {
     await expect(toBailianImageReference(localUrl)).resolves.toBe(
       "data:image/jpeg;base64," + Buffer.from("room-bytes").toString("base64"),
     );
+  });
+
+  it("fetches Vercel Blob images and converts them to data URLs", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(Buffer.from("blob-image"), {
+        status: 200,
+        headers: { "Content-Type": "image/png" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { toBailianImageReference } = await import("@/lib/files/storage");
+
+    await expect(
+      toBailianImageReference(
+        "https://example.public.blob.vercel-storage.com/uploads/room.png",
+      ),
+    ).resolves.toBe(
+      "data:image/png;base64," + Buffer.from("blob-image").toString("base64"),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.public.blob.vercel-storage.com/uploads/room.png",
+      { cache: "no-store" },
+    );
+  });
+
+  it("rejects unsupported Vercel Blob image types", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(Buffer.from("gif-image"), {
+          status: 200,
+          headers: { "Content-Type": "image/gif" },
+        }),
+      ),
+    );
+    const { toBailianImageReference } = await import("@/lib/files/storage");
+
+    await expect(
+      toBailianImageReference(
+        "https://example.public.blob.vercel-storage.com/uploads/room.gif",
+      ),
+    ).rejects.toThrow("图片格式不支持，请使用 JPG、PNG 或 WebP");
+  });
+
+  it("rejects Vercel Blob images larger than 7 MiB", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(Buffer.alloc(7 * 1024 * 1024 + 1), {
+          status: 200,
+          headers: { "Content-Type": "image/jpeg" },
+        }),
+      ),
+    );
+    const { toBailianImageReference } = await import("@/lib/files/storage");
+
+    await expect(
+      toBailianImageReference(
+        "https://example.public.blob.vercel-storage.com/uploads/room.jpg",
+      ),
+    ).rejects.toThrow("单张图片不能超过 7MB");
   });
 });
