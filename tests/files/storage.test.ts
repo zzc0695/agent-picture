@@ -147,6 +147,12 @@ describe("file storage", () => {
       expect.objectContaining({ cache: "no-store", signal: expect.any(AbortSignal) }),
     );
   });
+  it("submits a validated public Blob URL without embedding image bytes", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("image", { headers: { "Content-Type": "image/png" } })));
+    const { toAsyncImageReference } = await import("@/lib/files/storage");
+    const url = "https://example.public.blob.vercel-storage.com/uploads/room.png";
+    expect(await toAsyncImageReference(url)).toBe(url);
+  });
 
   it("rejects unsupported Vercel Blob image types", async () => {
     vi.stubGlobal(

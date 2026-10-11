@@ -205,3 +205,23 @@ export async function toBailianImageReference(imageUrl: string) {
 
   return validatedImageDataUrl(image.bytes, image.contentType);
 }
+
+// Async task submission must stay small; use public Blob references when available.
+export async function toAsyncImageReference(imageUrl: string) {
+  if (isVercelBlobUrl(imageUrl)) {
+    // Keep the same size/format validation as material analysis.
+    await readVercelBlobImage(imageUrl);
+    return imageUrl;
+  }
+  if (imageUrl.startsWith("/demo/") && isBlobStorageEnabled()) {
+    const image = await readPublicImage(imageUrl);
+    if (!image) throw new MaterialImageInputError("示例图片读取失败");
+    validatedImageDataUrl(image.bytes, image.contentType);
+    const digest = crypto.createHash("sha256").update(image.bytes).digest("hex");
+    const blob = await put(`demo/${digest}${path.extname(imageUrl)}`, image.bytes, {
+      access: "public", contentType: image.contentType, addRandomSuffix: false, allowOverwrite: true,
+    });
+    return blob.url;
+  }
+  return toBailianImageReference(imageUrl);
+}

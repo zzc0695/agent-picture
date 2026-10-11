@@ -18,7 +18,7 @@ export async function startImageJob(merchantId: string, body: unknown) {
   let stage = "references";
   let referenceMs = 0;
   try {
-    const { config, content } = await prepareImageGeneration(input);
+    const { config, content } = await prepareImageGeneration(input, true);
     referenceMs = Date.now() - started;
     stage = "submission";
     const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt: input.negativePrompt });

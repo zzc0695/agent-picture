@@ -7,6 +7,7 @@ import { AiUnavailableError } from "@/lib/ai/errors";
 import {
   saveGeneratedImage,
   toBailianImageReference,
+  toAsyncImageReference,
 } from "@/lib/files/storage";
 
 export async function prepareImageGeneration(input: {
@@ -18,7 +19,7 @@ export async function prepareImageGeneration(input: {
   fidelity: string;
   imageAnalysis: string;
   referenceImageUrl?: string;
-}) {
+}, asyncMode = false) {
   const config = getBailianConfig();
 
   if (!config.apiKey) {
@@ -41,7 +42,7 @@ export async function prepareImageGeneration(input: {
 
   const baseImageUrl = input.referenceImageUrl ?? input.roomImageUrl;
   const references = await Promise.all(
-    [baseImageUrl, input.styleImageUrl, input.detailImageUrl].map(toBailianImageReference),
+    [baseImageUrl, input.styleImageUrl, input.detailImageUrl].map(asyncMode ? toAsyncImageReference : toBailianImageReference),
   );
   const content: BailianContentPart[] = references.map((image) => ({ image }));
 
