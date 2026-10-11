@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardLayout from "@/app/(dashboard)/layout";
 import { requirePageMerchantSession } from "@/lib/auth/require-session";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
 
 vi.mock("@/lib/auth/require-session", () => ({
   requirePageMerchantSession: vi.fn(async () => ({

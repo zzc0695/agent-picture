@@ -4,13 +4,14 @@ import { startImageJob, pollImageJob } from "@/lib/ai/image-jobs";
 import { db } from "@/lib/db";
 import { getBailianImageTask, submitBailianImage } from "@/lib/ai/bailian";
 import { persistEffectImage } from "@/lib/ai/image";
+vi.mock("@/lib/usage", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/usage")>(), reserveUsage: vi.fn(async (input) => db.generationRecord.create({ data: { ...input, status: "submitting", usageUnits: 0 } })) }));
 vi.mock("@/lib/db", () => ({ db: { generationRecord: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }, customerPlan: { findFirst: vi.fn() } } }));
 vi.mock("@/lib/ai/bailian", () => ({ getBailianConfig: () => ({ apiKey: "key" }), submitBailianImage: vi.fn(), getBailianImageTask: vi.fn() }));
 vi.mock("@/lib/ai/image", () => ({ prepareImageGeneration: vi.fn(async () => ({ config: { apiKey: "key", imageModel: "model" }, content: [] })), persistEffectImage: vi.fn() }));
 const job = { id: "job", merchantId: "m", type: "image_generation", status: "running", providerTaskId: "provider", createdAt: new Date(), inputSummary: "prompt", timings: { referenceMs: 1 } };
 const input = { roomImageUrl: "/demo/room.png", styleImageUrl: "/demo/style.png", detailImageUrl: "/demo/detail.png", optimizedPrompt: "窗帘", fidelity: "balanced" };
 describe("durable image jobs", () => {
-  beforeEach(() => { vi.resetAllMocks(); vi.mocked(db.generationRecord.update).mockImplementation(async ({ data }) => ({ ...job, ...data }) as never); });
+  beforeEach(() => { vi.clearAllMocks(); vi.mocked(db.generationRecord.update).mockImplementation(({ data }) => Promise.resolve({ ...job, ...data }) as never); });
   it("scopes task lookup to the merchant before contacting the provider", async () => {
     vi.mocked(db.generationRecord.findFirst).mockResolvedValue(null);
     expect(await pollImageJob("other", "job")).toBeNull();

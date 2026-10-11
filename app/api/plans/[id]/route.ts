@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 import { planSchema } from "@/lib/validators";
+import { ownedCustomer } from "@/lib/plans";
 
 export async function GET(
   _request: Request,
@@ -33,6 +34,8 @@ export async function PATCH(
   if (!session) return unauthorizedResponse();
   const { id } = await params;
   const body = (await request.json()) as Record<string, unknown>;
+  const existing = await db.customerPlan.findFirst({ where: { id, merchantId: session.merchantId } });
+  if (!existing) return NextResponse.json({ error: "客户方案不存在" }, { status: 404 });
   const parsed = planSchema.partial().safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -46,6 +49,9 @@ export async function PATCH(
     Object.entries(input).filter(([key]) => key in body),
   );
   delete planInput.materialIds;
+  const customer = await ownedCustomer(session.merchantId, input.customerId);
+  if (input.customerId && !customer) return NextResponse.json({ error: "客户不存在" }, { status: 404 });
+  if (customer) planInput.customerName = customer.name;
   if (typeof input.styleImageUrl === "string" && "styleImageUrl" in body) {
     planInput.sampleImageUrl = input.styleImageUrl;
   }
@@ -55,4 +61,12 @@ export async function PATCH(
   });
 
   return NextResponse.json({ plan });
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
+  const { id } = await params;
+  const result = await db.customerPlan.deleteMany({ where: { id, merchantId: session.merchantId } });
+  return result.count ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "客户方案不存在" }, { status: 404 });
 }

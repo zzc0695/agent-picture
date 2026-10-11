@@ -40,7 +40,9 @@ export function getBailianConfig(
 export function createBailianTextClient(apiKey: string) {
   return new OpenAI({
     apiKey,
-    baseURL: textBaseUrl,
+    baseURL: process.env.DASHSCOPE_BASE_URL ? `${process.env.DASHSCOPE_BASE_URL}/compatible-mode/v1` : textBaseUrl,
+    timeout: 45_000,
+    maxRetries: 0,
   });
 }
 

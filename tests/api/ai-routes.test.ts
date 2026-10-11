@@ -22,7 +22,10 @@ vi.mock("@/lib/db", () => ({
   db: {
     generationRecord: {
       create: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(async () => 0),
     },
+    $transaction: vi.fn(async (action) => action(db)),
   },
 }));
 
@@ -49,6 +52,7 @@ function jsonRequest(url: string, body: unknown) {
 describe("AI API routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(db.generationRecord.create).mockResolvedValue({ id: "record" } as never);
   });
 
   it.each([
@@ -173,7 +177,7 @@ describe("AI API routes", () => {
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining('"event":"material_analysis_failed"'),
     );
-    expect(db.generationRecord.create).not.toHaveBeenCalled();
+    expect(db.generationRecord.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "failed", failureReason: expect.any(String) }) }));
     log.mockRestore();
   });
 
@@ -200,7 +204,7 @@ describe("AI API routes", () => {
     );
     expect(String(log.mock.calls[0]?.[0])).not.toContain("sk-secret");
     expect(String(log.mock.calls[0]?.[0])).toContain("[redacted-key]");
-    expect(db.generationRecord.create).not.toHaveBeenCalled();
+    expect(db.generationRecord.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "failed" }) }));
     log.mockRestore();
   });
 });

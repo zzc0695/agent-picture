@@ -17,7 +17,10 @@ vi.mock("@/lib/db", () => ({
     customerPlan: {
       create: vi.fn(),
       update: vi.fn(),
+      findFirst: vi.fn(),
     },
+    customer: { findFirst: vi.fn() },
+    material: { count: vi.fn(async () => 1) },
   },
 }));
 
@@ -33,6 +36,9 @@ const storedPlan = {
   id: "plan_1",
   merchantId: "merchant_1",
   customerName: "王女士",
+  customerId: null,
+  shareToken: null,
+  shareExpiresAt: null,
   notes: "",
   roomImageUrl: "/uploads/room.jpg",
   sampleImageUrl: "/uploads/style.jpg",
@@ -56,6 +62,20 @@ const storedPlan = {
 describe("plans API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(db.customerPlan.findFirst).mockResolvedValue(storedPlan);
+  });
+
+  it("rejects editing another merchant's plan", async () => {
+    vi.mocked(db.customerPlan.findFirst).mockResolvedValueOnce(null);
+    expect((await PATCH(jsonRequest({ notes: "changed" }), { params: Promise.resolve({ id: "other" }) })).status).toBe(404);
+    expect(db.customerPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects associating another merchant's customer", async () => {
+    vi.mocked(db.customer.findFirst).mockResolvedValueOnce(null);
+    expect((await PATCH(jsonRequest({ customerId: "other_customer" }), { params: Promise.resolve({ id: "plan_1" }) })).status).toBe(404);
+    expect(db.customer.findFirst).toHaveBeenCalledWith({ where: { id: "other_customer", merchantId: "merchant_1" } });
+    expect(db.customerPlan.update).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid plan payloads", async () => {

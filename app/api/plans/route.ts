@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 import { planSchema } from "@/lib/validators";
+import { ownedCustomer } from "@/lib/plans";
 
 export async function GET() {
   const session = await requireMerchantSession();
@@ -30,10 +31,16 @@ export async function POST(request: Request) {
   }
 
   const input = parsed.data;
+  const customer = await ownedCustomer(session.merchantId, input.customerId);
+  if (input.customerId && !customer) return NextResponse.json({ error: "客户不存在" }, { status: 404 });
+  if (input.materialIds.length && await db.material.count({ where: { id: { in: input.materialIds }, merchantId: session.merchantId } }) !== new Set(input.materialIds).size) {
+    return NextResponse.json({ error: "素材不存在" }, { status: 404 });
+  }
   const plan = await db.customerPlan.create({
     data: {
       merchantId: session.merchantId,
-      customerName: input.customerName,
+      customerName: customer?.name ?? input.customerName,
+      customerId: customer?.id ?? null,
       notes: input.notes,
       roomImageUrl: input.roomImageUrl,
       sampleImageUrl: input.styleImageUrl,

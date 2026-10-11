@@ -25,7 +25,7 @@ export function CustomerPlanCard({
           {plan.notes || "无备注"}
         </p>
         <p className="mt-2 text-[11px] font-medium tracking-wide text-stone-400">
-          {plan.status === "ready" ? "已生成" : plan.status === "draft" ? "草稿" : plan.status} · {new Date(plan.createdAt).toLocaleString("zh-CN")}
+          {plan.status === "ready" ? "已生成" : plan.status === "draft" ? "草稿" : plan.status === "delivered" ? "已交付" : plan.status} · {new Date(plan.createdAt).toLocaleString("zh-CN")}
         </p>
       </div>
       <ArrowRight

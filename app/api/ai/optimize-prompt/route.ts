@@ -5,7 +5,7 @@ import {
   requireMerchantSession,
   unauthorizedResponse,
 } from "@/lib/auth/require-session";
-import { db } from "@/lib/db";
+import { trackedText } from "@/lib/ai/tracked-text";
 import { fidelitySchema } from "@/lib/validators";
 
 export const maxDuration = 60;
@@ -29,17 +29,7 @@ export async function POST(request: Request) {
 
   const fidelity = parsedFidelity.data;
   try {
-    const result = await optimizePrompt({ userPrompt, materialSummary, fidelity });
-
-    await db.generationRecord.create({
-      data: {
-        merchantId: session.merchantId,
-        type: "prompt_optimization",
-        inputSummary: userPrompt.slice(0, 240),
-        status: "succeeded",
-        usageUnits: 1,
-      },
-    });
+    const result = await trackedText(session.merchantId, "prompt_optimization", userPrompt, () => optimizePrompt({ userPrompt, materialSummary, fidelity }));
 
     return NextResponse.json(result);
   } catch (error) {

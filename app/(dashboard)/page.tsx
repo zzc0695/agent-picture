@@ -98,6 +98,8 @@ const pageTransition = {
 export default function WorkbenchPage() {
   const [activeStep, setActiveStep] = useState<FlowStep>(0);
   const [customerName, setCustomerName] = useState("王女士");
+  const [customerId, setCustomerId] = useState("");
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [planName, setPlanName] = useState("客厅");
   const [prompt, setPrompt] = useState(roomPrompt);
   const [originalPrompt, setOriginalPrompt] = useState(roomPrompt);
@@ -124,6 +126,12 @@ export default function WorkbenchPage() {
   const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
   const frameRef = useRef<HTMLDivElement>(null);
   const inputReady = Boolean(roomImageUrl && styleImageUrl && detailImageUrl);
+
+  useEffect(() => {
+    let stopped = false;
+    void fetch("/api/customers").then(response => response.ok ? response.json() : null).then(result => { if (!stopped && result?.customers) setCustomers(result.customers); }).catch(() => undefined);
+    return () => { stopped = true; };
+  }, []);
 
   useEffect(() => {
     let stopped = false;
@@ -388,6 +396,7 @@ export default function WorkbenchPage() {
     setActionNotice("");
     try {
       const result = await postJson<{ plan: { id: string } }>("/api/plans", {
+        customerId: customerId || null,
         customerName: customerName.trim(),
         notes: `${planName.trim()}窗帘方案`,
         roomImageUrl,
@@ -467,6 +476,9 @@ export default function WorkbenchPage() {
             {activeStep === 0 ? (
               <PageWrapper id="editor">
                 <EditorView
+                  customers={customers}
+                  customerId={customerId}
+                  onCustomerSelect={(id) => { setCustomerId(id); const customer = customers.find(item => item.id === id); if (customer) setCustomerName(customer.name); clearResult(); }}
                   customerName={customerName}
                   planName={planName}
                   onCustomerNameChange={(value) => { setCustomerName(value); clearResult(); }}
@@ -658,6 +670,9 @@ function StudioHeader({
 }
 
 function EditorView({
+  customers,
+  customerId,
+  onCustomerSelect,
   customerName,
   planName,
   onCustomerNameChange,
@@ -679,6 +694,9 @@ function EditorView({
   onRemoveDetail,
   onAnalyze,
 }: {
+  customers: { id: string; name: string }[];
+  customerId: string;
+  onCustomerSelect: (id: string) => void;
   customerName: string;
   planName: string;
   onCustomerNameChange: (value: string) => void;
@@ -718,10 +736,14 @@ function EditorView({
       />
 
       <div className="hide-scrollbar flex-1 overflow-y-auto px-4 pb-28 pt-6">
+        <label className="mb-4 block px-2 text-xs text-stone-600">关联客户
+          <select value={customerId} onChange={(event) => onCustomerSelect(event.target.value)} disabled={busyAction !== null} className="mt-2 w-full rounded-xl border border-stone-200 bg-white p-3"><option value="">仅填写称呼</option>{customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select>
+          <Link href="/customers" className="mt-2 inline-block text-sage underline">管理客户</Link>
+        </label>
         <div className="mb-6 grid grid-cols-2 gap-3 px-2">
           <label className="text-xs text-stone-600">
             客户称呼
-            <input value={customerName} onChange={(event) => onCustomerNameChange(event.target.value)} disabled={busyAction !== null} maxLength={60} className="mt-2 w-full rounded-xl border border-stone-200 bg-white p-3" />
+            <input value={customerName} onChange={(event) => onCustomerNameChange(event.target.value)} disabled={busyAction !== null || Boolean(customerId)} maxLength={60} className="mt-2 w-full rounded-xl border border-stone-200 bg-white p-3" />
           </label>
           <label className="text-xs text-stone-600">
             房间名称

@@ -13,8 +13,10 @@ it("labels the login fields and prevents repeat submissions while signing in", a
   const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; }));
   vi.stubGlobal("fetch", fetchMock);
   render(<LoginPage />);
-  expect(screen.getByLabelText("邮箱")).toHaveValue("demo@example.com");
+  expect(screen.getByLabelText("邮箱")).toHaveValue("");
   expect(screen.getByLabelText("密码")).toHaveAttribute("type", "password");
+  await user.type(screen.getByLabelText("邮箱"), "demo@example.com");
+  await user.type(screen.getByLabelText("密码"), "demo123456");
   await user.click(screen.getByRole("button", { name: "登录" }));
   expect(screen.getByRole("button", { name: "登录中..." })).toBeDisabled();
   await act(async () => finish(Response.json({ ok: true })));
@@ -29,6 +31,8 @@ it.each(["network", "html"])("shows a recoverable error for a %s login failure",
     : vi.fn().mockResolvedValue(new Response("<html>error</html>", { status: 503 }));
   vi.stubGlobal("fetch", fetchMock);
   render(<LoginPage />);
+  await user.type(screen.getByLabelText("邮箱"), "demo@example.com");
+  await user.type(screen.getByLabelText("密码"), "demo123456");
   await user.click(screen.getByRole("button", { name: "登录" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(/重试/);
   expect(screen.getByRole("button", { name: "登录" })).toBeEnabled();

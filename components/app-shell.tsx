@@ -1,18 +1,25 @@
 import Link from "next/link";
+import { LogoutButton } from "@/components/logout-button";
 import {
   Boxes,
   History,
   Images,
   LayoutDashboard,
   MessageSquareText,
+  Users,
+  Gauge,
+  CircleHelp,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "工作台", icon: LayoutDashboard },
   { href: "/materials", label: "素材", icon: Boxes },
   { href: "/plans", label: "方案", icon: Images },
+  { href: "/customers", label: "客户", icon: Users },
   { href: "/prompts", label: "提示词", icon: MessageSquareText },
   { href: "/records", label: "记录", icon: History },
+  { href: "/usage", label: "用量", icon: Gauge },
+  { href: "/welcome", label: "使用指南", icon: CircleHelp },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -38,6 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          <LogoutButton />
         </nav>
         <main className="studio-main">{children}</main>
       </div>

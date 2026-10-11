@@ -4,7 +4,8 @@ import {
   requireMerchantSession,
   unauthorizedResponse,
 } from "@/lib/auth/require-session";
-import { db } from "@/lib/db";
+import { trackedText } from "@/lib/ai/tracked-text";
+import { UsageLimitError } from "@/lib/usage";
 import { MaterialImageInputError } from "@/lib/files/storage";
 import { materialAnalysisRequestSchema } from "@/lib/validators";
 import { AiUnavailableError } from "@/lib/ai/errors";
@@ -34,19 +35,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await analyzeMaterials(parsed.data);
-    await db.generationRecord.create({
-      data: {
-        merchantId: session.merchantId,
-        type: "material_analysis",
-        inputSummary: result.templatePrompt.slice(0, 240),
-        status: "succeeded",
-        usageUnits: 1,
-      },
-    });
+    const result = await trackedText(session.merchantId, "material_analysis", "三图素材识别", () => analyzeMaterials(parsed.data));
 
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof UsageLimitError) return NextResponse.json({ error: error.message }, { status: 429 });
     console.error(
       JSON.stringify({
         level: "error",

@@ -4,6 +4,7 @@ import { prepareImageGeneration, persistEffectImage } from "./image";
 import { AiUnavailableError } from "./errors";
 import { imageGenerationRequestSchema } from "@/lib/validators";
 import type { GenerationRecord } from "@prisma/client";
+import { reserveUsage } from "@/lib/usage";
 
 function view(job: GenerationRecord) {
   return { jobId: job.id, status: job.status, imageUrl: job.resultImageUrl, inputSummary: job.inputSummary,
@@ -12,8 +13,8 @@ function view(job: GenerationRecord) {
 export async function startImageJob(merchantId: string, body: unknown) {
   const input = imageGenerationRequestSchema.parse(body);
   if (input.planId && !await db.customerPlan.findFirst({ where: { id: input.planId, merchantId } })) throw new Error("客户方案不存在");
-  const job = await db.generationRecord.create({ data: { merchantId, planId: input.planId, type: "image_generation",
-    status: "submitting", usageUnits: 0, inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120), inputData: input } });
+  const job = await reserveUsage({ merchantId, planId: input.planId, type: "image_generation",
+    inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120), inputData: input });
   const started = Date.now();
   let stage = "references";
   let referenceMs = 0;

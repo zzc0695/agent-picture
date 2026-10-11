@@ -3,12 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requirePageMerchantSession } from "@/lib/auth/require-session";
+import { PlanManager } from "@/components/plan-manager";
 
 export default async function PlanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePageMerchantSession();
   const { id } = await params;
   const plan = await db.customerPlan.findFirst({ where: { id, merchantId: session.merchantId } });
   if (!plan) notFound();
+  const customers = await db.customer.findMany({ where: { merchantId: session.merchantId }, select: { id: true, name: true }, orderBy: { name: "asc" } });
 
   const copies = [
     ["短视频脚本", plan.shortVideoScript],
@@ -23,6 +25,7 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ id:
         <h1 className="text-2xl font-semibold text-stone-800">{plan.customerName}的方案</h1>
         <p className="mt-2 text-sm text-stone-500">{plan.notes || "未填写备注"}</p>
       </header>
+      <PlanManager plan={{ id: plan.id, customerId: plan.customerId, customerName: plan.customerName, notes: plan.notes, status: plan.status, shortVideoScript: plan.shortVideoScript, socialCopy: plan.socialCopy, customerScript: plan.customerScript, shareToken: plan.shareToken, shareExpiresAt: plan.shareExpiresAt?.toISOString() ?? null, primaryImageUrl: plan.primaryImageUrl }} customers={customers} />
       <section className="grid gap-4 md:grid-cols-2">
         <figure className="studio-card overflow-hidden p-3">
           <img src={plan.roomImageUrl} alt="客户空间原图" className="aspect-square w-full rounded-xl object-contain" />

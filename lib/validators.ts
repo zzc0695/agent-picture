@@ -45,6 +45,7 @@ export const imageGenerationRequestSchema = z.object({
 });
 
 export const planSchema = z.object({
+  customerId: z.string().min(1).nullable().optional(),
   customerName: z.string().min(1),
   notes: z.string().default(""),
   roomImageUrl: z.string().min(1),
@@ -60,6 +61,8 @@ export const planSchema = z.object({
   shortVideoScript: z.string().default(""),
   socialCopy: z.string().default(""),
   customerScript: z.string().default(""),
-  status: z.string().default("draft"),
+  status: z.enum(["draft", "ready", "delivered"]).default("draft"),
   materialIds: z.array(z.string()).default([]),
 });
+
+export const customerSchema = z.object({ name: z.string().trim().min(1).max(80), contact: z.string().trim().max(160).default(""), notes: z.string().trim().max(2000).default("") });

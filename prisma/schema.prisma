@@ -16,6 +16,8 @@ model Merchant {
   prompts      PromptTemplate[]
   plans        CustomerPlan[]
   records      GenerationRecord[]
+  customers    Customer[]
+  onboarded    Boolean            @default(true)
 }
 
 model Material {
@@ -49,6 +51,10 @@ model CustomerPlan {
   id               String             @id @default(cuid())
   merchantId       String
   customerName     String
+  customerId       String?
+  customer         Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  shareToken       String?            @unique
+  shareExpiresAt   DateTime?
   notes            String
   roomImageUrl     String
   sampleImageUrl   String
@@ -94,8 +100,23 @@ model GenerationRecord {
   inputData     Json?
   timings       Json?
   leaseUntil    DateTime?
+  estimatedCost Float         @default(0)
   usageUnits    Int           @default(1)
   createdAt     DateTime      @default(now())
   merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   plan          CustomerPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  @@index([merchantId, createdAt])
+}
+
+model Customer {
+  id         String         @id @default(cuid())
+  merchantId String
+  name       String
+  contact    String         @default("")
+  notes      String         @default("")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  merchant   Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  plans      CustomerPlan[]
+  @@index([merchantId])
 }
