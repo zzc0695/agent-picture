@@ -21,6 +21,12 @@ vi.mock("@/lib/files/storage", () => ({
 }));
 
 describe("generateEffectImage", () => {
+  it("does not return the original room as a generated image when the provider is unconfigured", async () => {
+    delete process.env.DASHSCOPE_API_KEY;
+    const { generateEffectImage } = await import("@/lib/ai/image");
+    await expect(generateEffectImage({ roomImageUrl: "/uploads/room.jpg", styleImageUrl: "/uploads/style.jpg", detailImageUrl: "/uploads/detail.jpg", optimizedPrompt: "窗帘", negativePrompt: "", fidelity: "balanced", imageAnalysis: "" })).rejects.toThrow("尚未配置");
+    expect(generateBailianImage).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -68,7 +74,7 @@ describe("generateEffectImage", () => {
       ],
       { negativePrompt: "避免窗户变形" },
     );
-    expect(fetch).toHaveBeenCalledWith("https://temporary.example/image.png");
+    expect(fetch).toHaveBeenCalledWith("https://temporary.example/image.png", { signal: expect.any(AbortSignal) });
     expect(saveGeneratedImage).toHaveBeenCalledWith(
       Buffer.from("generated-image"),
       "png",

@@ -113,7 +113,7 @@ describe("material image analysis", () => {
     ).rejects.toThrow();
   });
 
-  it("returns an editable fallback when no API key is configured", async () => {
+  it("reports an unconfigured service instead of inventing image analysis", async () => {
     const { analyzeMaterials } = await import("@/lib/ai/material-analysis");
 
     await expect(
@@ -122,9 +122,7 @@ describe("material image analysis", () => {
         styleImageUrl: "/uploads/style.jpg",
         detailImageUrl: "/uploads/detail.jpg",
       }),
-    ).resolves.toMatchObject({
-      templatePrompt: expect.stringContaining("窗帘"),
-    });
+    ).rejects.toThrow("尚未配置");
     expect(completionCreate).not.toHaveBeenCalled();
   });
 });

@@ -14,7 +14,7 @@ export default async function MaterialsPage() {
       <PageHeader
         eyebrow="MATERIAL LIBRARY"
         title="素材库"
-        description="集中管理窗帘、布料、五金和软装样本，生成时仍使用现有素材分类。"
+        description="查看窗帘、布料、五金和软装样本的图片及产品信息。"
       />
       {materials.length ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

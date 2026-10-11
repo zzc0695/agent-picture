@@ -1,4 +1,6 @@
 import type OpenAI from "openai";
+import { z } from "zod";
+import { AiUnavailableError, parseJsonOutput } from "@/lib/ai/errors";
 import {
   createBailianTextClient,
   extractChatCompletionText,
@@ -29,7 +31,7 @@ export function buildOptimizedPromptInput(input: PromptInput) {
     `样本还原度：${fidelityText[input.fidelity]}`,
     `商家样本信息：${input.materialSummary}`,
     `用户原始需求：${input.userPrompt}`,
-    "请输出：正向提示词、负向提示词。负向提示词需避免窗户变形、房间结构变化、窗帘位置错误、花纹跑偏、渲染不真实。",
+    "只返回 JSON 对象，包含两个非空字符串：optimizedPrompt 为可直接编辑的正向提示词，negativePrompt 为负向提示词。不要在正向提示词中混入 JSON 或负向提示词。负向提示词需避免窗户变形、房间结构变化、窗帘位置错误、花纹跑偏、渲染不真实。",
   ].join("\n");
 }
 
@@ -40,25 +42,21 @@ export async function optimizePrompt(input: PromptInput) {
   const config = getBailianConfig();
 
   if (!config.apiKey) {
-    return {
-      optimizedPrompt: `${input.userPrompt}。保留原房间结构、窗户位置、透视角度，${fidelityText[input.fidelity]}真实摄影质感。`,
-      negativePrompt:
-        "避免窗户变形、房间结构变化、窗帘位置错误、花纹跑偏、渲染不真实。",
-    };
+    throw new AiUnavailableError();
   }
 
   const request: BailianChatRequest = {
     model: config.textModel,
     messages: [{ role: "user", content: prompt }],
     enable_thinking: false,
+    response_format: { type: "json_object" },
   };
   const response = await createBailianTextClient(
     config.apiKey,
   ).chat.completions.create(request);
 
-  return {
-    optimizedPrompt: extractChatCompletionText(response),
-    negativePrompt:
-      "避免窗户变形、房间结构变化、窗帘位置错误、花纹跑偏、渲染不真实。",
-  };
+  return z.object({
+    optimizedPrompt: z.string().trim().min(1),
+    negativePrompt: z.string().trim().min(1),
+  }).parse(parseJsonOutput(extractChatCompletionText(response)));
 }

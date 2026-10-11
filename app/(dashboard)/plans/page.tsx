@@ -14,7 +14,7 @@ export default async function PlansPage() {
       <PageHeader
         eyebrow="CUSTOMER PROPOSALS"
         title="客户方案"
-        description="保存后的客户方案按当前状态和更新时间展示，后端方案数据结构保持不变。"
+        description="查看已保存的客户方案，点击卡片打开效果图、生成要求和营销文案。"
       />
       {plans.length ? (
         <div className="grid gap-4 lg:grid-cols-2">

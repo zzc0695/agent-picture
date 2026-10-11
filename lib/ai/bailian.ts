@@ -92,6 +92,8 @@ export async function generateBailianImage(
 ) {
   const response = await fetch(imageEndpoint, {
     method: "POST",
+    // End gracefully before the platform's 300-second execution limit.
+    signal: AbortSignal.timeout(240_000),
     headers: {
       Authorization: "Bearer " + apiKey,
       "Content-Type": "application/json",
@@ -105,7 +107,8 @@ export async function generateBailianImage(
         size: "1024*1024",
         n: 1,
         negative_prompt: options.negativePrompt || undefined,
-        prompt_extend: true,
+        // The workbench already supplies detailed constraints; avoid a second rewrite.
+        prompt_extend: false,
         watermark: false,
       },
     }),

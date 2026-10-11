@@ -14,7 +14,7 @@ export default async function PromptsPage() {
       <PageHeader
         eyebrow="PROMPT ATELIER"
         title="提示词库"
-        description="模板分类继续使用当前系统分类和商家自定义分类，只替换展示方式。"
+        description="浏览系统和个人提示词模板，参考适合当前房间与窗帘风格的描述。"
       />
       {templates.length ? (
         <div className="grid gap-4 lg:grid-cols-2">

@@ -1,7 +1,7 @@
 # Vercel Deployment
 
 This app is a Next.js App Router project with server routes, Prisma, OpenAI
-wrappers, and image uploads. Vercel can host the frontend and backend routes, but
+compatible Qwen clients, and image uploads. Vercel can host the frontend and backend routes, but
 production data must use managed storage instead of the local SQLite database
 and `storage/` directory used during early MVP development.
 
@@ -12,7 +12,7 @@ and `storage/` directory used during early MVP development.
   integration.
 - Vercel Blob store for uploaded customer room images, sample images, and
   generated effect images.
-- OpenAI API key for prompt optimization, marketing copy, and image generation.
+- Alibaba Cloud Bailian (DashScope) API key for material analysis, prompt optimization, marketing copy, and image generation.
 
 ## Environment Variables
 
@@ -21,14 +21,18 @@ Set these in Vercel Project Settings:
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"
 SESSION_SECRET="use-a-32-plus-character-random-secret"
-OPENAI_API_KEY="sk-..."
-OPENAI_TEXT_MODEL="gpt-5-mini"
-OPENAI_IMAGE_MODEL="gpt-image-1"
+DASHSCOPE_API_KEY="your-dashscope-api-key"
+DASHSCOPE_TEXT_MODEL="qwen3.7-flash"
+DASHSCOPE_IMAGE_MODEL="qwen-image-3.0"
 BLOB_READ_WRITE_TOKEN="vercel_blob_rw_..."
 ```
 
 `LOCAL_FILE_ROOT` is only for local development when `BLOB_READ_WRITE_TOKEN` is
 not set.
+
+The model names above match the defaults in `lib/ai/bailian.ts`; configure models
+available to your DashScope account. If the key is absent, AI endpoints return a
+503 error. The app does not present stock text or the input photo as AI output.
 
 ## Build And Database Setup
 
@@ -71,8 +75,8 @@ for local development.
 2. Create or connect a Postgres database and copy its pooled connection string
    into `DATABASE_URL`.
 3. Create a Vercel Blob store and copy `BLOB_READ_WRITE_TOKEN`.
-4. Add `SESSION_SECRET`, `OPENAI_API_KEY`, `OPENAI_TEXT_MODEL`, and
-   `OPENAI_IMAGE_MODEL`.
+4. Add `SESSION_SECRET`, `DASHSCOPE_API_KEY`, `DASHSCOPE_TEXT_MODEL`, and
+   `DASHSCOPE_IMAGE_MODEL`.
 5. Run `npm run prisma:deploy` once against the production database.
 6. Run `npm run prisma:seed` if the demo account should exist.
 7. Deploy on Vercel and verify login, upload, prompt optimization, image

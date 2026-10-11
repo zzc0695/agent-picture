@@ -109,6 +109,16 @@ describe("file storage", () => {
     );
   });
 
+  it("loads the bundled demo images as valid PNG data instead of expired external URLs", async () => {
+    const { toBailianImageReference } = await import("@/lib/files/storage");
+    for (const url of ["/demo/living-room.png", "/demo/curtain-fabric.png"]) {
+      const dataUrl = await toBailianImageReference(url);
+      expect(dataUrl).toMatch(/^data:image\/png;base64,/);
+      const bytes = Buffer.from(dataUrl.split(",")[1], "base64");
+      expect(bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    }
+  });
+
   it("fetches Vercel Blob images and converts them to data URLs", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(Buffer.from("blob-image"), {

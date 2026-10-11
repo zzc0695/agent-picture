@@ -7,6 +7,7 @@ import {
 import { db } from "@/lib/db";
 import { MaterialImageInputError } from "@/lib/files/storage";
 import { materialAnalysisRequestSchema } from "@/lib/validators";
+import { AiUnavailableError } from "@/lib/ai/errors";
 
 export const maxDuration = 60;
 
@@ -60,6 +61,9 @@ export async function POST(request: Request) {
 
     if (error instanceof MaterialImageInputError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof AiUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
     }
 
     return NextResponse.json(

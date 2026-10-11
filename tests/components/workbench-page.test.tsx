@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import WorkbenchPage from "@/app/(dashboard)/page";
 import { ResultPanel } from "@/components/result-panel";
 
-function mockApiResponses(options: { planError?: string } = {}) {
+function mockApiResponses(options: { planError?: string; generationError?: string } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
 
@@ -31,6 +31,7 @@ function mockApiResponses(options: { planError?: string } = {}) {
     }
 
     if (url.endsWith("/api/ai/generate-image")) {
+      if (options.generationError) return Response.json({ error: options.generationError }, { status: 502 });
       return Response.json({
         imageUrl: "/uploads/generated-effect.png",
         inputSummary: "balanced: 优化后的窗帘效果图提示词",
@@ -101,7 +102,7 @@ describe("WorkbenchPage", () => {
     expect(screen.getByText("客户空间")).toBeInTheDocument();
     expect(screen.getByText("材质样本")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "更多操作" }),
+      screen.getByLabelText("客户称呼"),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "进入下一步" }),
@@ -114,7 +115,7 @@ describe("WorkbenchPage", () => {
 
     await user.click(screen.getByRole("button", { name: "生成方案效果" }));
     expect(screen.getByText("效果呈现")).toBeInTheDocument();
-    expect(screen.getByText("渲染方案 01")).toBeInTheDocument();
+    expect(screen.getByAltText("生成效果图")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "保存方案" }));
     expect(screen.getByText("方案展示")).toBeInTheDocument();
@@ -124,8 +125,8 @@ describe("WorkbenchPage", () => {
     ).toHaveAttribute("href", "/plans");
     expect(screen.getByText("社交分享方案")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "发送给客户" }),
-    ).toBeInTheDocument();
+      screen.getByRole("link", { name: "查看已保存方案" }),
+    ).toHaveAttribute("href", "/plans/plan_1");
   });
 
   it("uses backend APIs for optimization, generation, marketing, and saving", async () => {
@@ -338,6 +339,95 @@ describe("WorkbenchPage", () => {
       "数据库暂时不可用",
     );
     expect(screen.getByText("效果呈现")).toBeInTheDocument();
+  });
+
+  it("uses the final edited prompt after optimization and saves the actual customer and input", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockApiResponses();
+    render(<WorkbenchPage />);
+    await user.clear(screen.getByLabelText("客户称呼"));
+    await user.type(screen.getByLabelText("客户称呼"), "李先生");
+    await user.clear(screen.getByLabelText("房间名称"));
+    await user.type(screen.getByLabelText("房间名称"), "卧室");
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "AI 润色" }));
+    await screen.findByDisplayValue("优化后的窗帘效果图提示词");
+    await user.clear(screen.getByLabelText("生成要求"));
+    await user.type(screen.getByLabelText("生成要求"), "蓝色窗帘，保留书桌");
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    await user.click(await screen.findByRole("button", { name: "保存方案" }));
+    const generation = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/generate-image"));
+    expect(JSON.parse(String(generation?.[1]?.body))).toMatchObject({ optimizedPrompt: "蓝色窗帘，保留书桌", negativePrompt: "" });
+    const save = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/plans"));
+    expect(JSON.parse(String(save?.[1]?.body))).toMatchObject({ customerName: "李先生", notes: "卧室窗帘方案", originalPrompt: "蓝色窗帘，保留书桌", optimizedPrompt: "蓝色窗帘，保留书桌" });
+  });
+
+  it("includes template text inserted after optimization in the generation request", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockApiResponses();
+    render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "AI 润色" }));
+    await screen.findByDisplayValue("优化后的窗帘效果图提示词");
+    await user.click(screen.getByRole("button", { name: /模板库/ }));
+    await user.click(screen.getByRole("button", { name: "插入到当前" }));
+    const finalText = (screen.getByLabelText("生成要求") as HTMLTextAreaElement).value;
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/generate-image"));
+    expect(JSON.parse(String(call?.[1]?.body)).optimizedPrompt).toBe(finalText);
+    expect(finalText).toContain("现代简约风格窗帘");
+  });
+
+  it("shows image generation errors on the requirements step", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({ generationError: "AI 效果图生成暂时失败，请稍后重试" });
+    render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("AI 效果图生成暂时失败");
+    expect(screen.getByRole("button", { name: "生成方案效果" })).toBeEnabled();
+  });
+
+  it("blocks incomplete references and allows restoring the demo inputs", async () => {
+    const user = userEvent.setup();
+    mockApiResponses();
+    render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button", { name: "删除材质细节图片" }));
+    expect(screen.getByRole("button", { name: "进入下一步" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "恢复示例" }));
+    expect(screen.getByRole("button", { name: "进入下一步" })).toBeEnabled();
+  });
+
+  it("compares the actual room image and clears copy when a new image is generated", async () => {
+    const user = userEvent.setup();
+    mockApiResponses();
+    render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    await user.click(await screen.findByRole("button", { name: "对比原图" }));
+    expect(screen.getByAltText("客户空间原图")).toHaveAttribute("src", "/demo/living-room.png");
+    await user.click(screen.getByRole("button", { name: "返回效果图" }));
+    expect(screen.getByAltText("生成效果图")).toHaveAttribute("src", "/uploads/generated-effect.png");
+    await user.click(screen.getByRole("button", { name: "生成营销文案" }));
+    await screen.findByText("接口返回的朋友圈文案");
+    await user.click(screen.getByRole("button", { name: "生成更多方案" }));
+    expect(screen.queryByText("接口返回的朋友圈文案")).not.toBeInTheDocument();
+  });
+
+  it("copies the generated text and does not create a duplicate plan on repeated save", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+    const fetchMock = mockApiResponses();
+    render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button", { name: "进入下一步" }));
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    await user.click(await screen.findByRole("button", { name: "生成营销文案" }));
+    await user.click(screen.getByRole("button", { name: "保存方案" }));
+    await user.click(await screen.findByRole("button", { name: "复制社交分享方案" }));
+    expect(writeText).toHaveBeenCalledWith("接口返回的朋友圈文案");
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    await user.click(screen.getByRole("button", { name: "保存方案" }));
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/api/plans"))).toHaveLength(1);
   });
 });
 

@@ -101,7 +101,7 @@ describe("Bailian provider", () => {
         size: "1024*1024",
         n: 1,
         negative_prompt: "避免改变房间结构",
-        prompt_extend: true,
+        prompt_extend: false,
         watermark: false,
       },
     });

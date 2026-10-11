@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  ArrowRight,
   CheckCircle2,
   ChevronLeft,
   Copy,
@@ -17,7 +16,6 @@ import {
   LayoutGrid,
   LayoutTemplate,
   Maximize2,
-  MoreHorizontal,
   MoveRight,
   Plus,
   Quote,
@@ -33,11 +31,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { ImageViewer } from "@/components/image-viewer";
 
-const customerName = "王女士";
-const planName = "客厅";
-
 const roomPrompt =
-  "现代轻奢风格客厅，窗帘采用米色绒布拼接白色纱帘，落地款，搭配金色金属轨道。\n\n沙发选用浅灰色，搭配米色与墨绿色靠垫。\n\n整体氛围要求温暖、明亮并且具有精致的纹理感，灯光柔和。";
+  "保留原房间的结构、家具、窗户位置和光线方向，仅调整窗帘。参考整体款式图的造型与配色，以及材质细节图的纹理与垂感，生成真实自然的窗帘上墙效果。";
 
 const promptTags = ["现代极简", "高遮光度", "奶油暖白", "保留窗户结构"];
 const promptTemplates = [
@@ -58,30 +53,13 @@ const promptTemplates = [
   },
 ];
 
-const materialSummary = "米白高遮光绒布窗帘，垂感好，搭配白纱帘和金色轨道";
+const materialSummary = "请参考商家上传的款式与材质图片；未识别的颜色、成分及遮光性能不作断言。";
 const demoRoomImageUrl =
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=85";
+  "/demo/living-room.png";
 const demoSampleImageUrl =
-  "https://images.unsplash.com/photo-1583847268964-b28e50bc78d3?auto=format&fit=crop&w=800&q=85";
+  "/demo/curtain-fabric.png";
 const demoDetailImageUrl =
-  "https://images.unsplash.com/photo-1596484552834-58eb4ea79eb6?auto=format&fit=crop&w=800&q=85";
-
-const IMAGES = {
-  room: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
-  fabric1: "https://images.unsplash.com/photo-1583847268964-b28e50bc78d3?auto=format&fit=crop&w=200&q=80",
-  fabric2: "https://images.unsplash.com/photo-1563298723-dcfebaa392e3?auto=format&fit=crop&w=200&q=80",
-  fabric3: "https://images.unsplash.com/photo-1596484552834-58eb4ea79eb6?auto=format&fit=crop&w=200&q=80",
-  hardware: "https://images.unsplash.com/photo-1610824771380-390c72f79f11?auto=format&fit=crop&w=200&q=80",
-  result: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&q=80",
-};
-
-function isRenderableImageUrl(url: string) {
-  return (
-    Boolean(url) &&
-    !url.startsWith("/demo/") &&
-    url !== "/sample-material.jpg"
-  );
-}
+  "/demo/curtain-fabric.png";
 
 const fidelityOptions = [
   ["strict", "严格", "精确匹配", Focus],
@@ -119,8 +97,10 @@ const pageTransition = {
 
 export default function WorkbenchPage() {
   const [activeStep, setActiveStep] = useState<FlowStep>(0);
+  const [customerName, setCustomerName] = useState("王女士");
+  const [planName, setPlanName] = useState("客厅");
   const [prompt, setPrompt] = useState(roomPrompt);
-  const [optimizedPrompt, setOptimizedPrompt] = useState("");
+  const [originalPrompt, setOriginalPrompt] = useState(roomPrompt);
   const [negativePrompt, setNegativePrompt] = useState("");
   const [fidelity, setFidelity] = useState<Fidelity>("balanced");
   const [roomImageUrl, setRoomImageUrl] = useState(demoRoomImageUrl);
@@ -142,6 +122,24 @@ export default function WorkbenchPage() {
   const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
   const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
   const frameRef = useRef<HTMLDivElement>(null);
+  const inputReady = Boolean(roomImageUrl && styleImageUrl && detailImageUrl);
+
+  function clearResult() {
+    setImageUrl("");
+    setShortVideoScript("");
+    setSocialCopy("");
+    setCustomerScript("");
+    setSavedPlanId("");
+    setActionNotice("");
+    setActionError("");
+  }
+
+  function updatePrompt(value: string) {
+    setPrompt(value);
+    setOriginalPrompt(value);
+    setNegativePrompt("");
+    clearResult();
+  }
 
   useEffect(() => {
     if (typeof frameRef.current?.scrollTo === "function") {
@@ -168,6 +166,7 @@ export default function WorkbenchPage() {
   }
 
   async function optimizePrompt() {
+    if (busyAction || !prompt.trim()) return;
     setBusyAction("optimize");
     setActionError("");
     try {
@@ -182,8 +181,8 @@ export default function WorkbenchPage() {
         fidelity,
       });
       setPrompt(result.optimizedPrompt);
-      setOptimizedPrompt(result.optimizedPrompt);
       setNegativePrompt(result.negativePrompt);
+      clearResult();
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : "AI 润色失败，请重试",
@@ -194,6 +193,7 @@ export default function WorkbenchPage() {
   }
 
   async function uploadImage(file: File, target: "room" | "style" | "detail") {
+    if (busyAction) return;
     setBusyAction(`upload-${target}`);
     setUploadError("");
 
@@ -219,6 +219,8 @@ export default function WorkbenchPage() {
       }
       setImageAnalysis(null);
       setAnalysisError("");
+      setNegativePrompt("");
+      clearResult();
     } catch (error) {
       setUploadError(
         error instanceof Error ? error.message : "图片上传失败，请稍后重试",
@@ -229,14 +231,18 @@ export default function WorkbenchPage() {
   }
 
   function removeImage(target: "room" | "style" | "detail") {
+    if (busyAction) return;
     if (target === "room") setRoomImageUrl("");
     if (target === "style") setStyleImageUrl("");
     if (target === "detail") setDetailImageUrl("");
     setImageAnalysis(null);
     setAnalysisError("");
+    setNegativePrompt("");
+    clearResult();
   }
 
   async function analyzeUploadedImages() {
+    if (busyAction || !inputReady) return;
     setBusyAction("analyze");
     setAnalysisError("");
     try {
@@ -245,9 +251,7 @@ export default function WorkbenchPage() {
         { roomImageUrl, styleImageUrl, detailImageUrl },
       );
       setImageAnalysis(result);
-      setPrompt(result.templatePrompt);
-      setOptimizedPrompt("");
-      setNegativePrompt("");
+      updatePrompt(result.templatePrompt);
       setActiveStep(1);
     } catch (error) {
       setAnalysisError(
@@ -259,6 +263,7 @@ export default function WorkbenchPage() {
   }
 
   async function generateImage(referenceImageUrl?: string) {
+    if (busyAction || !inputReady || !prompt.trim()) return;
     setBusyAction("generate");
     setActionError("");
     try {
@@ -268,13 +273,15 @@ export default function WorkbenchPage() {
           roomImageUrl,
           styleImageUrl,
           detailImageUrl,
-          optimizedPrompt: optimizedPrompt || prompt,
+          optimizedPrompt: prompt,
           negativePrompt,
           fidelity,
           imageAnalysis: imageAnalysis ? JSON.stringify(imageAnalysis) : "",
           referenceImageUrl,
         },
       );
+      if (!result.imageUrl) throw new Error("未收到效果图，请重试");
+      clearResult();
       setImageUrl(result.imageUrl);
       setActiveStep(2);
     } catch (error) {
@@ -287,6 +294,7 @@ export default function WorkbenchPage() {
   }
 
   async function generateMarketing() {
+    if (busyAction || !imageUrl) return;
     setBusyAction("marketing");
     setActionError("");
     try {
@@ -298,13 +306,14 @@ export default function WorkbenchPage() {
         materialSummary: imageAnalysis
           ? `${imageAnalysis.styleSummary}；${imageAnalysis.materialSummary}`
           : materialSummary,
-        roomSummary: optimizedPrompt || prompt,
-        effectImageUrl: imageUrl || roomImageUrl,
-        customerNotes: "王女士客厅窗帘方案",
+        roomSummary: prompt,
+        effectImageUrl: imageUrl,
+        customerNotes: `${customerName} · ${planName}窗帘方案`,
       });
       setShortVideoScript(result.shortVideoScript);
       setSocialCopy(result.socialCopy);
       setCustomerScript(result.customerScript);
+      setSavedPlanId("");
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : "营销文案生成失败，请重试",
@@ -315,23 +324,29 @@ export default function WorkbenchPage() {
   }
 
   async function savePlan() {
+    if (busyAction || !imageUrl) return;
+    if (savedPlanId) {
+      setActionNotice("方案已保存");
+      setActiveStep(3);
+      return;
+    }
     setBusyAction("save");
     setActionError("");
     setActionNotice("");
     try {
       const result = await postJson<{ plan: { id: string } }>("/api/plans", {
-        customerName: "王女士",
-        notes: "客厅窗帘方案",
+        customerName: customerName.trim(),
+        notes: `${planName.trim()}窗帘方案`,
         roomImageUrl,
         sampleImageUrl: styleImageUrl,
         styleImageUrl,
         detailImageUrl,
         imageAnalysis: imageAnalysis ? JSON.stringify(imageAnalysis) : "{}",
-        originalPrompt: roomPrompt,
-        optimizedPrompt: optimizedPrompt || prompt,
+        originalPrompt,
+        optimizedPrompt: prompt,
         negativePrompt,
         fidelity,
-        primaryImageUrl: imageUrl || roomImageUrl,
+        primaryImageUrl: imageUrl,
         shortVideoScript,
         socialCopy,
         customerScript,
@@ -398,6 +413,19 @@ export default function WorkbenchPage() {
             {activeStep === 0 ? (
               <PageWrapper id="editor">
                 <EditorView
+                  customerName={customerName}
+                  planName={planName}
+                  onCustomerNameChange={(value) => { setCustomerName(value); clearResult(); }}
+                  onPlanNameChange={(value) => { setPlanName(value); clearResult(); }}
+                  onRestoreDemo={() => {
+                    setRoomImageUrl(demoRoomImageUrl);
+                    setStyleImageUrl(demoSampleImageUrl);
+                    setDetailImageUrl(demoDetailImageUrl);
+                    setImageAnalysis(null);
+                    setAnalysisError("");
+                    setUploadError("");
+                    updatePrompt(roomPrompt);
+                  }}
                   roomImageUrl={roomImageUrl}
                   styleImageUrl={styleImageUrl}
                   detailImageUrl={detailImageUrl}
@@ -405,7 +433,6 @@ export default function WorkbenchPage() {
                   busyAction={busyAction}
                   uploadError={uploadError}
                   analysisError={analysisError}
-                  onBack={() => undefined}
                   onNext={() => setActiveStep(1)}
                   onUploadRoom={(file) => uploadImage(file, "room")}
                   onUploadStyle={(file) => uploadImage(file, "style")}
@@ -423,9 +450,11 @@ export default function WorkbenchPage() {
                   prompt={prompt}
                   fidelity={fidelity}
                   busyAction={busyAction}
-                  onBack={() => setActiveStep(0)}
-                  onPromptChange={setPrompt}
-                  onFidelityChange={setFidelity}
+                  actionError={actionError}
+                  inputReady={inputReady}
+                  onBack={() => { if (!busyAction) setActiveStep(0); }}
+                  onPromptChange={updatePrompt}
+                  onFidelityChange={(value) => { setFidelity(value); setNegativePrompt(""); clearResult(); }}
                   onOpenPromptLibrary={() => setPromptLibraryOpen(true)}
                   onOptimize={optimizePrompt}
                   onNext={() => generateImage()}
@@ -435,6 +464,8 @@ export default function WorkbenchPage() {
             {activeStep === 2 ? (
               <PageWrapper id="result">
                 <ResultView
+                  roomImageUrl={roomImageUrl}
+                  planName={planName}
                   imageUrl={imageUrl}
                   shortVideoScript={shortVideoScript}
                   socialCopy={socialCopy}
@@ -443,7 +474,7 @@ export default function WorkbenchPage() {
                   downloading={downloading}
                   actionNotice={actionNotice}
                   actionError={actionError}
-                  onBack={() => setActiveStep(1)}
+                  onBack={() => { if (!busyAction) setActiveStep(1); }}
                   onSimilar={() => generateImage(imageUrl)}
                   onMarketing={generateMarketing}
                   onNext={savePlan}
@@ -455,6 +486,11 @@ export default function WorkbenchPage() {
             {activeStep === 3 ? (
               <PageWrapper id="display">
                 <DisplayView
+                  customerName={customerName}
+                  planName={planName}
+                  materialDescription={imageAnalysis?.materialSummary || "未进行 AI 识别，请以实际样本为准"}
+                  prompt={prompt}
+                  onEdit={() => setActiveStep(1)}
                   customerTab={customerTab}
                   fidelity={fidelity}
                   imageUrl={imageUrl}
@@ -477,19 +513,17 @@ export default function WorkbenchPage() {
             <PromptLibrarySheet
               onClose={() => setPromptLibraryOpen(false)}
               onInsert={(body) => {
-                setPrompt((current) => `${current}${current ? "\n" : ""}${body}`);
+                updatePrompt(`${prompt}${prompt ? "\n" : ""}${body}`);
                 setPromptLibraryOpen(false);
               }}
               onReplace={(body) => {
-                setPrompt(body);
-                setOptimizedPrompt("");
-                setNegativePrompt("");
+                updatePrompt(body);
                 setPromptLibraryOpen(false);
               }}
             />
           ) : null}
           <ImageViewer
-            imageUrl={isRenderableImageUrl(imageUrl) ? imageUrl : IMAGES.result}
+            imageUrl={imageUrl}
             open={viewerOpen}
             onClose={() => setViewerOpen(false)}
             onDownload={downloadImage}
@@ -532,7 +566,7 @@ function StudioHeader({
         transparent ? "bg-transparent pt-6" : "glass-panel mx-3 mt-3 rounded-2xl"
       }`}
     >
-      <button
+      {onBack ? <button
         type="button"
         aria-label="返回"
         onClick={onBack}
@@ -543,7 +577,7 @@ function StudioHeader({
         }`}
       >
         <ChevronLeft size={22} strokeWidth={1.5} className="-ml-0.5" />
-      </button>
+      </button> : <div className="size-10" />}
 
       <div className="flex min-w-0 flex-1 flex-col items-center px-3">
         <div
@@ -570,6 +604,11 @@ function StudioHeader({
 }
 
 function EditorView({
+  customerName,
+  planName,
+  onCustomerNameChange,
+  onPlanNameChange,
+  onRestoreDemo,
   roomImageUrl,
   styleImageUrl,
   detailImageUrl,
@@ -577,7 +616,6 @@ function EditorView({
   busyAction,
   uploadError,
   analysisError,
-  onBack,
   onNext,
   onUploadRoom,
   onUploadStyle,
@@ -587,6 +625,11 @@ function EditorView({
   onRemoveDetail,
   onAnalyze,
 }: {
+  customerName: string;
+  planName: string;
+  onCustomerNameChange: (value: string) => void;
+  onPlanNameChange: (value: string) => void;
+  onRestoreDemo: () => void;
   roomImageUrl: string;
   styleImageUrl: string;
   detailImageUrl: string;
@@ -594,7 +637,6 @@ function EditorView({
   busyAction: string | null;
   uploadError: string;
   analysisError: string;
-  onBack: () => void;
   onNext: () => void;
   onUploadRoom: (file: File) => void;
   onUploadStyle: (file: File) => void;
@@ -619,19 +661,20 @@ function EditorView({
       <StudioHeader
         title="设计工作室"
         subtitle={`${customerName} · ${planName}`}
-        onBack={onBack}
-        rightIcon={
-          <button
-            type="button"
-            aria-label="更多操作"
-            className="flex size-8 items-center justify-center rounded-full transition-colors hover:bg-stone-100"
-          >
-            <MoreHorizontal size={18} strokeWidth={1.5} />
-          </button>
-        }
       />
 
       <div className="hide-scrollbar flex-1 overflow-y-auto px-4 pb-28 pt-6">
+        <div className="mb-6 grid grid-cols-2 gap-3 px-2">
+          <label className="text-xs text-stone-600">
+            客户称呼
+            <input value={customerName} onChange={(event) => onCustomerNameChange(event.target.value)} disabled={busyAction !== null} maxLength={60} className="mt-2 w-full rounded-xl border border-stone-200 bg-white p-3" />
+          </label>
+          <label className="text-xs text-stone-600">
+            房间名称
+            <input value={planName} onChange={(event) => onPlanNameChange(event.target.value)} disabled={busyAction !== null} maxLength={60} className="mt-2 w-full rounded-xl border border-stone-200 bg-white p-3" />
+          </label>
+        </div>
+        <p className="mb-5 px-2 text-xs leading-6 text-stone-500">已预填示例信息与图片，可修改后体验。请上传房间、整体款式和材质细节三张图片。</p>
         <div className="mb-8 flex items-center gap-3 px-2">
           <div className="size-1.5 rounded-full bg-sage shadow-[0_0_8px_rgba(83,98,87,0.6)]" />
           <span className="text-[11px] font-medium tracking-widest text-sage">
@@ -651,9 +694,11 @@ function EditorView({
             </h2>
             <button
               type="button"
+              onClick={onRestoreDemo}
+              disabled={busyAction !== null}
               className="flex items-center gap-1 text-[11px] tracking-wide text-stone-400 transition-colors hover:text-sage"
             >
-              示例
+              恢复示例
             </button>
           </div>
 
@@ -675,6 +720,7 @@ function EditorView({
                   type="button"
                   aria-label="删除客户空间图片"
                   onClick={onRemoveRoom}
+                  disabled={busyAction !== null}
                   className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"
                 >
                   <X size={15} />
@@ -692,6 +738,7 @@ function EditorView({
                 type="file"
                 accept="image/*"
                 aria-label="上传客户空间图片"
+                disabled={busyAction !== null}
                 className="sr-only"
                 onChange={(event) => {
                   const file = event.currentTarget.files?.[0];
@@ -702,7 +749,7 @@ function EditorView({
               <button
                 type="button"
                 onClick={() => roomFileInputRef.current?.click()}
-                disabled={roomUploading}
+                disabled={busyAction !== null}
                 className="flex flex-1 items-center justify-center gap-2 text-[12px] font-medium tracking-wide text-stone-500 transition-colors hover:text-sage"
               >
                 <UploadCloud size={14} strokeWidth={2} />
@@ -715,7 +762,7 @@ function EditorView({
               <button
                 type="button"
                 onClick={() => roomFileInputRef.current?.click()}
-                disabled={roomUploading}
+                disabled={busyAction !== null}
                 className="flex flex-1 items-center justify-center gap-2 text-[12px] font-medium tracking-wide text-stone-500 transition-colors hover:text-sage"
               >
                 <RefreshCw size={14} strokeWidth={2} />
@@ -747,6 +794,7 @@ function EditorView({
               imageUrl={styleImageUrl}
               imageAlt="整体款式参考"
               uploading={styleUploading}
+              disabled={busyAction !== null}
               onChoose={() => styleFileInputRef.current?.click()}
               onRemove={onRemoveStyle}
               removeLabel="删除整体款式图片"
@@ -757,6 +805,7 @@ function EditorView({
               imageUrl={detailImageUrl}
               imageAlt="材质细节参考"
               uploading={detailUploading}
+              disabled={busyAction !== null}
               onChoose={() => detailFileInputRef.current?.click()}
               onRemove={onRemoveDetail}
               removeLabel="删除材质细节图片"
@@ -766,6 +815,7 @@ function EditorView({
               type="file"
               accept="image/*"
               aria-label="上传整体款式图片"
+              disabled={busyAction !== null}
               className="sr-only"
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
@@ -778,6 +828,7 @@ function EditorView({
               type="file"
               accept="image/*"
               aria-label="上传材质细节图片"
+              disabled={busyAction !== null}
               className="sr-only"
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
@@ -834,14 +885,8 @@ function EditorView({
         <div className="glass-panel flex gap-2 rounded-3xl p-2 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.15)]">
           <button
             type="button"
-            aria-label="辅助操作"
-            className="studio-icon-button size-14"
-          >
-            <MoreHorizontal size={20} strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
             onClick={onNext}
+            disabled={!analysisReady || !customerName.trim() || !planName.trim() || busyAction !== null}
             className="studio-primary-button group relative flex flex-1 items-center justify-center gap-2 overflow-hidden"
           >
             <div className="absolute inset-0 h-full w-full -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:animate-[pulse_1.5s_infinite]" />
@@ -860,6 +905,7 @@ function MaterialReferenceCard({
   imageUrl,
   imageAlt,
   uploading,
+  disabled,
   onChoose,
   onRemove,
   removeLabel,
@@ -869,6 +915,7 @@ function MaterialReferenceCard({
   imageUrl: string;
   imageAlt: string;
   uploading: boolean;
+  disabled: boolean;
   onChoose: () => void;
   onRemove: () => void;
   removeLabel: string;
@@ -882,6 +929,7 @@ function MaterialReferenceCard({
           <button
             type="button"
             onClick={onChoose}
+            disabled={disabled}
             className="flex h-full w-full flex-col items-center justify-center gap-2 text-stone-400"
           >
             <Plus size={20} />
@@ -893,6 +941,7 @@ function MaterialReferenceCard({
             type="button"
             aria-label={removeLabel}
             onClick={onRemove}
+            disabled={disabled}
             className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"
           >
             <X size={13} />
@@ -905,7 +954,7 @@ function MaterialReferenceCard({
         <button
           type="button"
           onClick={onChoose}
-          disabled={uploading}
+          disabled={disabled}
           className="mt-2 text-[10px] font-medium text-sage disabled:opacity-50"
         >
           {uploading ? "上传中..." : imageUrl ? "更换图片" : "选择图片"}
@@ -919,6 +968,8 @@ function RequirementsView({
   prompt,
   fidelity,
   busyAction,
+  actionError,
+  inputReady,
   onBack,
   onPromptChange,
   onFidelityChange,
@@ -929,6 +980,8 @@ function RequirementsView({
   prompt: string;
   fidelity: Fidelity;
   busyAction: string | null;
+  actionError: string;
+  inputReady: boolean;
   onBack: () => void;
   onPromptChange: (value: string) => void;
   onFidelityChange: (value: Fidelity) => void;
@@ -946,6 +999,7 @@ function RequirementsView({
           <button
             type="button"
             onClick={onOpenPromptLibrary}
+            disabled={busyAction !== null}
             className="flex items-center gap-1 text-[11px] font-medium tracking-wider text-sage transition-opacity hover:opacity-80"
           >
             <LayoutTemplate size={14} strokeWidth={2} />
@@ -955,6 +1009,7 @@ function RequirementsView({
       />
 
       <div className="hide-scrollbar flex-1 overflow-y-auto px-4 pb-32 pt-6">
+        {actionError ? <p role="alert" className="mb-4 rounded-2xl bg-red-50 p-4 text-sm text-red-700">{actionError}</p> : null}
         <motion.section
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -965,24 +1020,24 @@ function RequirementsView({
             <textarea
               aria-label="生成要求"
               value={prompt}
+              disabled={busyAction !== null}
               onChange={(event) => onPromptChange(event.target.value)}
               className="relative z-10 h-40 w-full resize-none bg-transparent font-serif text-[15px] italic leading-relaxed text-stone-700 outline-none placeholder:text-stone-300"
               placeholder="描述您期望的氛围、材质与光影细节..."
               spellCheck={false}
-              maxLength={800}
             />
             <div className="mt-2 flex items-center justify-between border-t border-stone-50 pt-3">
               <button
                 type="button"
                 onClick={onOptimize}
-                disabled={busyAction === "optimize"}
+                disabled={busyAction !== null || !prompt.trim()}
                 className="flex items-center gap-1.5 rounded-full bg-sage/5 px-3 py-1.5 text-[11px] font-medium tracking-wide text-sage transition-colors hover:bg-sage/10"
               >
                 <Wand2 size={12} strokeWidth={2} />
                 {busyAction === "optimize" ? "润色中" : "AI 润色"}
               </button>
               <span className="font-mono text-[10px] text-stone-400">
-                {prompt.length} / 800
+                {prompt.length} 字
               </span>
             </div>
           </div>
@@ -1004,6 +1059,7 @@ function RequirementsView({
                 type="button"
                 className="rounded-full border border-stone-200 bg-white/50 px-4 py-2 text-[12px] font-medium text-stone-600 shadow-sm backdrop-blur-sm transition-all hover:border-sage hover:text-sage"
                 onClick={() => onPromptChange(`${prompt}${prompt ? "\n" : ""}${tag}`)}
+                disabled={busyAction !== null}
               >
                 {tag}
               </button>
@@ -1029,6 +1085,8 @@ function RequirementsView({
                   key={id}
                   type="button"
                   onClick={() => onFidelityChange(id as Fidelity)}
+                  disabled={busyAction !== null}
+                  aria-pressed={active}
                   className={`flex min-h-[92px] flex-col items-center justify-center rounded-2xl border p-3 text-center transition-all ${
                     active
                       ? "border-sage bg-sage text-white shadow-lg shadow-sage/20"
@@ -1058,19 +1116,22 @@ function RequirementsView({
           <button
             type="button"
             onClick={onNext}
-            disabled={busyAction === "generate"}
+            disabled={busyAction !== null || !inputReady || !prompt.trim()}
             className="studio-primary-button flex w-full items-center justify-center gap-2"
           >
             {busyAction === "generate" ? "生成中" : "生成方案效果"}
             <Sparkles size={16} strokeWidth={1.5} className="text-sand" />
           </button>
         </div>
+        {busyAction === "generate" && <p role="status" className="mt-2 text-center text-xs text-stone-600">图片生成可能需要 1–3 分钟，请保持页面打开，无需重复点击。</p>}
       </div>
     </div>
   );
 }
 
 function ResultView({
+  roomImageUrl,
+  planName,
   imageUrl,
   shortVideoScript,
   socialCopy,
@@ -1086,6 +1147,8 @@ function ResultView({
   onDownload,
   onOpenViewer,
 }: {
+  roomImageUrl: string;
+  planName: string;
   imageUrl: string;
   shortVideoScript: string;
   socialCopy: string;
@@ -1101,7 +1164,8 @@ function ResultView({
   onDownload: () => void;
   onOpenViewer: () => void;
 }) {
-  const displayImage = isRenderableImageUrl(imageUrl) ? imageUrl : IMAGES.result;
+  const [showOriginal, setShowOriginal] = useState(false);
+  const displayImage = imageUrl;
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-black text-white">
@@ -1112,8 +1176,8 @@ function ResultView({
         className="absolute inset-0 z-0 bg-stone-900"
       >
         <img
-          src={displayImage}
-          alt="生成效果图"
+          src={showOriginal ? roomImageUrl : displayImage}
+          alt={showOriginal ? "客户空间原图" : "生成效果图"}
           className="h-full w-full object-cover opacity-90"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
@@ -1128,7 +1192,7 @@ function ResultView({
             type="button"
             aria-label="重新生成"
             onClick={onSimilar}
-            disabled={busyAction === "generate"}
+            disabled={busyAction !== null}
             className="flex size-10 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white backdrop-blur-md transition-colors hover:bg-black/40"
           >
             <RefreshCw size={16} strokeWidth={2} />
@@ -1153,26 +1217,26 @@ function ResultView({
         >
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-[10px] font-medium tracking-widest text-white shadow-sm backdrop-blur-md">
-              渲染方案 01
+              {showOriginal ? "客户空间原图" : "生成效果图"}
             </span>
             <button
               type="button"
+              onClick={() => setShowOriginal((value) => !value)}
+              aria-pressed={showOriginal}
               className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 backdrop-blur-md transition-colors hover:bg-black/60"
             >
               <SlidersHorizontal size={12} className="text-white" />
               <span className="text-[10px] font-medium tracking-widest text-white">
-                对比原图
+                {showOriginal ? "返回效果图" : "对比原图"}
               </span>
             </button>
           </div>
 
           <h1 className="mb-3 font-serif text-[32px] font-medium leading-tight tracking-wide drop-shadow-lg">
-            柔和雅致
-            <br />
-            休憩之境
+            {planName}窗帘方案
           </h1>
           <p className="mb-6 max-w-[90%] text-[13px] font-light leading-relaxed tracking-wide text-white/90">
-            柔软的触感与温润的米白色调，交织在细腻光影中，为客户呈现宁静、柔软、有呼吸感的空间。
+            请对比原图检查窗户位置、房间结构与材质表现。AI 效果图供方案沟通参考，实际颜色和尺寸请以实物为准。
           </p>
 
           {shortVideoScript || socialCopy || customerScript ? (
@@ -1205,7 +1269,7 @@ function ResultView({
             <button
               type="button"
               onClick={onNext}
-              disabled={busyAction === "save"}
+              disabled={busyAction !== null}
               className="flex items-center justify-center gap-2 rounded-[20px] bg-white py-4 text-[13px] font-medium tracking-widest text-stone-900 shadow-xl transition-colors hover:bg-stone-100 disabled:opacity-60"
             >
               <Share2 size={16} strokeWidth={1.5} />
@@ -1228,7 +1292,7 @@ function ResultView({
             <button
               type="button"
               onClick={onMarketing}
-              disabled={busyAction === "marketing"}
+              disabled={busyAction !== null}
               className="flex items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-black/30 py-3.5 text-white backdrop-blur-xl transition-colors hover:bg-black/50"
             >
               <Wand2 size={16} strokeWidth={1.5} className="text-stone-300" />
@@ -1239,7 +1303,7 @@ function ResultView({
             <button
               type="button"
               onClick={onSimilar}
-              disabled={busyAction === "generate"}
+              disabled={busyAction !== null}
               className="flex items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-black/30 py-3.5 text-white backdrop-blur-xl transition-colors hover:bg-black/50"
             >
               <LayoutGrid size={16} strokeWidth={1.5} className="text-stone-300" />
@@ -1255,6 +1319,11 @@ function ResultView({
 }
 
 function DisplayView({
+  customerName,
+  planName,
+  materialDescription,
+  prompt,
+  onEdit,
   customerTab,
   fidelity,
   imageUrl,
@@ -1269,6 +1338,11 @@ function DisplayView({
   onDownload,
   onOpenViewer,
 }: {
+  customerName: string;
+  planName: string;
+  materialDescription: string;
+  prompt: string;
+  onEdit: () => void;
   customerTab: CustomerTab;
   fidelity: Fidelity;
   imageUrl: string;
@@ -1285,7 +1359,7 @@ function DisplayView({
 }) {
   const fidelityLabel =
     fidelityOptions.find(([value]) => value === fidelity)?.[1] ?? "平衡";
-  const displayImage = isRenderableImageUrl(imageUrl) ? imageUrl : IMAGES.result;
+  const displayImage = imageUrl;
 
   return (
     <div className="relative flex h-full flex-col">
@@ -1295,6 +1369,7 @@ function DisplayView({
         rightIcon={
           <button
             type="button"
+            onClick={onEdit}
             className="text-[11px] font-medium tracking-widest text-sage transition-opacity hover:opacity-80"
           >
             编辑
@@ -1367,10 +1442,10 @@ function DisplayView({
                   客户：{customerName}
                 </div>
                 <div className="rounded-2xl bg-white/55 px-4 py-3">
-                  房间：客厅窗帘方案
+                  房间：{planName}窗帘方案
                 </div>
                 <div className="rounded-2xl bg-white/55 px-4 py-3">
-                  样本：米白高遮光绒布窗帘
+                  样本：{materialDescription}
                 </div>
                 <div className="rounded-2xl bg-white/55 px-4 py-3">
                   还原度：{fidelityLabel}
@@ -1381,11 +1456,7 @@ function DisplayView({
               <h3 className="font-serif text-[16px] font-medium text-stone-800">
                 生成上下文
               </h3>
-              <ul className="mt-4 space-y-2 text-[13px] leading-6 text-stone-600">
-                <li>保留原房间结构、窗户位置和透视角度。</li>
-                <li>保留样本主要颜色、材质纹理和自然垂感。</li>
-                <li>避免窗户变形、窗帘位置错误和渲染不真实。</li>
-              </ul>
+              <p className="mt-4 whitespace-pre-wrap text-[13px] leading-6 text-stone-600">{prompt}</p>
             </section>
           </div>
         ) : (
@@ -1414,21 +1485,15 @@ function DisplayView({
 
               <div className="absolute -bottom-4 right-6 flex flex-col items-center rounded-full border-2 border-white bg-sage px-5 py-2.5 text-white shadow-lg">
                 <span className="mb-0.5 text-[10px] tracking-widest opacity-80">
-                  风格特征
+                  方案状态
                 </span>
-                <span className="font-serif text-[13px]">现代极简</span>
+                <span className="font-serif text-[13px]">{savedPlanId ? "已保存" : "待保存"}</span>
               </div>
             </motion.div>
 
             <div className="mt-10 space-y-8 px-2">
-              <CopySection title="社交分享方案">
-                {socialCopy ||
-                  "在喧嚣中寻找宁静。柔软的米色基调配合温润光影，让每一次归家都成为一场治愈之旅。"}
-              </CopySection>
-              <CopySection title="客户沟通话术">
-                {customerScript ||
-                  "这套方案以暖白和米色为基准，最大化引入自然光照。主窗帘推荐采用高克重绒面材质，视觉触感细腻，也能提供稳定遮光包裹感。"}
-              </CopySection>
+              <CopySection title="社交分享方案" text={socialCopy} />
+              <CopySection title="客户沟通话术" text={customerScript} />
             </div>
           </>
         )}
@@ -1445,13 +1510,7 @@ function DisplayView({
             <Download size={16} aria-hidden="true" />
             {downloading ? "下载中" : "下载高清图"}
           </button>
-          <button
-            type="button"
-            className="studio-primary-button flex items-center justify-center gap-2"
-          >
-            发送给客户
-            <ArrowRight size={16} strokeWidth={1.5} />
-          </button>
+          <Link href={savedPlanId ? `/plans/${savedPlanId}` : "/plans"} className="studio-primary-button flex items-center justify-center gap-2">查看已保存方案</Link>
         </div>
       </div>
     </div>
@@ -1460,11 +1519,20 @@ function DisplayView({
 
 function CopySection({
   title,
-  children,
+  text,
 }: {
   title: string;
-  children: ReactNode;
+  text: string;
 }) {
+  const [notice, setNotice] = useState("");
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice("已复制");
+    } catch {
+      setNotice("复制失败，请选中文案手动复制");
+    }
+  }
   return (
     <motion.section
       initial={{ opacity: 0, y: 10 }}
@@ -1474,6 +1542,9 @@ function CopySection({
         <h3 className="font-serif text-[14px] text-stone-800">{title}</h3>
         <button
           type="button"
+          aria-label={`复制${title}`}
+          disabled={!text}
+          onClick={copy}
           className="flex items-center gap-1 text-[10px] tracking-widest text-stone-400 transition-colors hover:text-sage"
         >
           <Copy size={12} />
@@ -1482,9 +1553,10 @@ function CopySection({
       </div>
       <div className="relative">
         <div className="absolute bottom-0 left-0 top-0 w-px bg-sand/50" />
-        <p className="pl-4 font-serif text-[13px] leading-relaxed text-stone-600">
-          {children}
+        <p className="whitespace-pre-wrap pl-4 font-serif text-[13px] leading-relaxed text-stone-600">
+          {text || "尚未生成文案，请返回效果页点击“生成营销文案”。"}
         </p>
+        {notice ? <p role="status" className="mt-2 text-xs text-sage">{notice}</p> : null}
       </div>
     </motion.section>
   );

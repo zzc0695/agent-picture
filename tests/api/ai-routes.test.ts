@@ -7,6 +7,7 @@ import { generateEffectImage } from "@/lib/ai/image";
 import { optimizePrompt } from "@/lib/ai/prompt";
 import { db } from "@/lib/db";
 import { MaterialImageInputError } from "@/lib/files/storage";
+import { AiUnavailableError } from "@/lib/ai/errors";
 
 vi.mock("@/lib/auth/require-session", () => ({
   requireMerchantSession: vi.fn(async () => ({
@@ -48,6 +49,30 @@ function jsonRequest(url: string, body: unknown) {
 describe("AI API routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it.each([
+    new DOMException("timed out", "TimeoutError"),
+    new DOMException("aborted", "AbortError"),
+    Object.assign(new Error("timed out"), { name: "TimeoutError" }),
+  ])("returns a readable timeout instead of a blank platform error (%s)", async (error) => {
+    vi.mocked(generateEffectImage).mockRejectedValue(error);
+    const response = await generateImagePost(jsonRequest("http://localhost/api/ai/generate-image", {
+      roomImageUrl: "/demo/living-room.png", styleImageUrl: "/demo/curtain-fabric.png", detailImageUrl: "/demo/curtain-fabric.png", optimizedPrompt: "米白窗帘", fidelity: "balanced",
+    }));
+    expect(response.status).toBe(504);
+    expect((await response.json()).error).toContain("等待超时");
+    expect(db.generationRecord.create).not.toHaveBeenCalled();
+  });
+
+  it.each([new AiUnavailableError(), new Error("provider failed")])("returns JSON when image generation fails without recording success", async (error) => {
+    vi.mocked(generateEffectImage).mockRejectedValue(error);
+    const response = await generateImagePost(jsonRequest("http://localhost/api/ai/generate-image", {
+      roomImageUrl: "/uploads/room.jpg", styleImageUrl: "/uploads/style.jpg", detailImageUrl: "/uploads/detail.jpg", optimizedPrompt: "蓝色窗帘", fidelity: "balanced",
+    }));
+    expect(response.status).toBe(error instanceof AiUnavailableError ? 503 : 502);
+    expect((await response.json()).error).toMatch(/AI/);
+    expect(db.generationRecord.create).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid prompt optimization fidelity", async () => {

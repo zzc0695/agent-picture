@@ -1,4 +1,5 @@
 import type OpenAI from "openai";
+import { AiUnavailableError } from "@/lib/ai/errors";
 import {
   createBailianTextClient,
   extractChatCompletionText,
@@ -40,13 +41,7 @@ export async function analyzeMaterials(input: MaterialAnalysisInput) {
   const config = getBailianConfig();
 
   if (!config.apiKey) {
-    return {
-      roomSummary: "明亮的现代客厅，保留现有窗户结构、空间布局与自然光线。",
-      styleSummary: "采用整体款式参考图中的窗帘层次、褶皱比例与配色关系。",
-      materialSummary: "采用细节参考图中的面料颜色、纹理、厚度与垂坠质感。",
-      templatePrompt:
-        "保留客户房间的结构、窗户位置、透视角度和主要光线方向，为窗户安装整体款式参考图中的窗帘造型，并准确还原材质细节图中的颜色、纹理、厚度和垂感，生成真实自然的室内摄影效果。",
-    };
+    throw new AiUnavailableError();
   }
 
   const imageUrls = await Promise.all([

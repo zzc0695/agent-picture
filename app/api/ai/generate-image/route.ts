@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateEffectImage } from "@/lib/ai/image";
+import { aiErrorResponse } from "@/lib/ai/http";
 import {
   requireMerchantSession,
   unauthorizedResponse,
@@ -10,7 +11,8 @@ import {
   imageGenerationRequestSchema,
 } from "@/lib/validators";
 
-export const maxDuration = 60;
+// Qwen image editing routinely exceeds 60 seconds. Leave time for storing the result.
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
@@ -35,27 +37,31 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await generateEffectImage({
-    roomImageUrl: parsed.data.roomImageUrl,
-    styleImageUrl: parsed.data.styleImageUrl,
-    detailImageUrl: parsed.data.detailImageUrl,
-    optimizedPrompt: parsed.data.optimizedPrompt,
-    negativePrompt: parsed.data.negativePrompt,
-    fidelity: parsed.data.fidelity,
-    imageAnalysis: parsed.data.imageAnalysis,
-    referenceImageUrl: parsed.data.referenceImageUrl,
-  });
+  try {
+    const result = await generateEffectImage({
+      roomImageUrl: parsed.data.roomImageUrl,
+      styleImageUrl: parsed.data.styleImageUrl,
+      detailImageUrl: parsed.data.detailImageUrl,
+      optimizedPrompt: parsed.data.optimizedPrompt,
+      negativePrompt: parsed.data.negativePrompt,
+      fidelity: parsed.data.fidelity,
+      imageAnalysis: parsed.data.imageAnalysis,
+      referenceImageUrl: parsed.data.referenceImageUrl,
+    });
 
-  await db.generationRecord.create({
-    data: {
-      merchantId: session.merchantId,
-      planId: parsed.data.planId,
-      type: "image_generation",
-      inputSummary: result.inputSummary,
-      status: "succeeded",
-      usageUnits: 1,
-    },
-  });
+    await db.generationRecord.create({
+      data: {
+        merchantId: session.merchantId,
+        planId: parsed.data.planId,
+        type: "image_generation",
+        inputSummary: result.inputSummary,
+        status: "succeeded",
+        usageUnits: 1,
+      },
+    });
 
-  return NextResponse.json(result);
+    return NextResponse.json(result);
+  } catch (error) {
+    return aiErrorResponse(error, "AI 效果图生成暂时失败，请稍后重试");
+  }
 }

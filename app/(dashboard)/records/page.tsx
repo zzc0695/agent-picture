@@ -14,7 +14,7 @@ export default async function RecordsPage() {
       <PageHeader
         eyebrow="GENERATION HISTORY"
         title="生成记录"
-        description="记录仍来自当前后端生成流水，类型、状态和消耗单位不做前端重分类。"
+        description="查看图片识别、提示词润色、效果图和营销文案的调用记录。"
       />
       {records.length ? (
         <div className="grid gap-4">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { optimizePrompt } from "@/lib/ai/prompt";
+import { aiErrorResponse } from "@/lib/ai/http";
 import {
   requireMerchantSession,
   unauthorizedResponse,
@@ -7,11 +8,16 @@ import {
 import { db } from "@/lib/db";
 import { fidelitySchema } from "@/lib/validators";
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
   if (!session) return unauthorizedResponse();
   const body = await request.json();
   const userPrompt = String(body.userPrompt ?? "");
+  if (!userPrompt.trim()) {
+    return NextResponse.json({ error: "请先填写生成要求" }, { status: 400 });
+  }
   const materialSummary = String(body.materialSummary ?? "");
   const parsedFidelity = fidelitySchema.safeParse(body.fidelity ?? "strict");
   if (!parsedFidelity.success) {
@@ -22,17 +28,21 @@ export async function POST(request: Request) {
   }
 
   const fidelity = parsedFidelity.data;
-  const result = await optimizePrompt({ userPrompt, materialSummary, fidelity });
+  try {
+    const result = await optimizePrompt({ userPrompt, materialSummary, fidelity });
 
-  await db.generationRecord.create({
-    data: {
-      merchantId: session.merchantId,
-      type: "prompt_optimization",
-      inputSummary: userPrompt.slice(0, 240),
-      status: "succeeded",
-      usageUnits: 1,
-    },
-  });
+    await db.generationRecord.create({
+      data: {
+        merchantId: session.merchantId,
+        type: "prompt_optimization",
+        inputSummary: userPrompt.slice(0, 240),
+        status: "succeeded",
+        usageUnits: 1,
+      },
+    });
 
-  return NextResponse.json(result);
+    return NextResponse.json(result);
+  } catch (error) {
+    return aiErrorResponse(error, "AI 润色暂时失败，请稍后重试");
+  }
 }

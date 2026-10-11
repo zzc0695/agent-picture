@@ -31,7 +31,7 @@ describe("Bailian text generation", () => {
   it("uses Qwen chat completions for prompt optimization", async () => {
     process.env.DASHSCOPE_API_KEY = "test-key";
     completionCreate.mockResolvedValue({
-      choices: [{ message: { content: "优化后的提示词" } }],
+      choices: [{ message: { content: JSON.stringify({ optimizedPrompt: "优化后的提示词", negativePrompt: "避免窗户变形" }) } }],
     });
     const { optimizePrompt } = await import("@/lib/ai/prompt");
 
@@ -56,7 +56,7 @@ describe("Bailian text generation", () => {
   it("uses Qwen chat completions for marketing copy", async () => {
     process.env.DASHSCOPE_API_KEY = "test-key";
     completionCreate.mockResolvedValue({
-      choices: [{ message: { content: "可直接使用的营销文案" } }],
+      choices: [{ message: { content: JSON.stringify({ shortVideoScript: "先展示原图再展示效果", socialCopy: "新款窗帘搭配分享", customerScript: "请确认您喜欢的配色" }) } }],
     });
     const { generateMarketingCopy } = await import("@/lib/ai/marketing");
 
@@ -68,15 +68,30 @@ describe("Bailian text generation", () => {
         customerNotes: "偏温馨",
       }),
     ).resolves.toEqual({
-      shortVideoScript: "可直接使用的营销文案",
-      socialCopy: "可直接使用的营销文案",
-      customerScript: "可直接使用的营销文案",
+      shortVideoScript: "先展示原图再展示效果",
+      socialCopy: "新款窗帘搭配分享",
+      customerScript: "请确认您喜欢的配色",
     });
     expect(completionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         model: "qwen3.7-flash",
         enable_thinking: false,
+        response_format: { type: "json_object" },
       }),
     );
+  });
+
+  it("rejects missing or unstructured copy instead of repeating the whole output", async () => {
+    process.env.DASHSCOPE_API_KEY = "test-key";
+    completionCreate.mockResolvedValue({ choices: [{ message: { content: '{"socialCopy":"只有一段"}' } }] });
+    const { generateMarketingCopy } = await import("@/lib/ai/marketing");
+    await expect(generateMarketingCopy({ materialSummary: "布料", roomSummary: "客厅", effectImageUrl: "/uploads/result.png", customerNotes: "" })).rejects.toThrow();
+  });
+
+  it("reports unconfigured text services instead of presenting canned text as AI output", async () => {
+    const { generateMarketingCopy } = await import("@/lib/ai/marketing");
+    const { optimizePrompt } = await import("@/lib/ai/prompt");
+    await expect(generateMarketingCopy({ materialSummary: "布料", roomSummary: "客厅", effectImageUrl: "/uploads/result.png", customerNotes: "" })).rejects.toThrow("尚未配置");
+    await expect(optimizePrompt({ userPrompt: "窗帘", fidelity: "balanced", materialSummary: "布料" })).rejects.toThrow("尚未配置");
   });
 });

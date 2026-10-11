@@ -3,6 +3,7 @@ import {
   getBailianConfig,
   type BailianContentPart,
 } from "@/lib/ai/bailian";
+import { AiUnavailableError } from "@/lib/ai/errors";
 import {
   saveGeneratedImage,
   toBailianImageReference,
@@ -21,10 +22,7 @@ export async function generateEffectImage(input: {
   const config = getBailianConfig();
 
   if (!config.apiKey) {
-    return {
-      imageUrl: input.referenceImageUrl ?? input.roomImageUrl,
-      inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120),
-    };
+    throw new AiUnavailableError();
   }
 
   const imageRoleText = input.referenceImageUrl
@@ -42,11 +40,10 @@ export async function generateEffectImage(input: {
     .join("\n");
 
   const baseImageUrl = input.referenceImageUrl ?? input.roomImageUrl;
-  const content: BailianContentPart[] = [
-    { image: await toBailianImageReference(baseImageUrl) },
-    { image: await toBailianImageReference(input.styleImageUrl) },
-    { image: await toBailianImageReference(input.detailImageUrl) },
-  ];
+  const references = await Promise.all(
+    [baseImageUrl, input.styleImageUrl, input.detailImageUrl].map(toBailianImageReference),
+  );
+  const content: BailianContentPart[] = references.map((image) => ({ image }));
 
   content.push({ text: prompt });
 
@@ -56,7 +53,7 @@ export async function generateEffectImage(input: {
     content,
     { negativePrompt: input.negativePrompt },
   );
-  const imageResponse = await fetch(temporaryImageUrl);
+  const imageResponse = await fetch(temporaryImageUrl, { signal: AbortSignal.timeout(30_000) });
 
   if (!imageResponse.ok) {
     throw new Error("无法下载图片生成结果");
