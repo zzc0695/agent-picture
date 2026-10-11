@@ -1,67 +1,23 @@
 import { NextResponse } from "next/server";
-import { generateEffectImage } from "@/lib/ai/image";
+import { startImageJob } from "@/lib/ai/image-jobs";
 import { aiErrorResponse } from "@/lib/ai/http";
-import {
-  requireMerchantSession,
-  unauthorizedResponse,
-} from "@/lib/auth/require-session";
+import { requireMerchantSession, unauthorizedResponse } from "@/lib/auth/require-session";
+import { imageGenerationRequestSchema } from "@/lib/validators";
 import { db } from "@/lib/db";
-import {
-  fidelitySchema,
-  imageGenerationRequestSchema,
-} from "@/lib/validators";
-
-// Qwen image editing routinely exceeds 60 seconds. Leave time for storing the result.
-export const maxDuration = 300;
-
+export const maxDuration = 90;
+export async function GET() {
+  const session = await requireMerchantSession();
+  if (!session) return unauthorizedResponse();
+  const job = await db.generationRecord.findFirst({ where: { merchantId: session.merchantId, type: "image_generation",
+    status: { in: ["submitting", "running"] }, createdAt: { gt: new Date(Date.now() - 23 * 3600_000) } }, orderBy: { createdAt: "desc" } });
+  return NextResponse.json({ jobId: job?.id ?? null }, { headers: { "Cache-Control": "no-store" } });
+}
 export async function POST(request: Request) {
   const session = await requireMerchantSession();
   if (!session) return unauthorizedResponse();
-  const body = await request.json();
-  const parsedFidelity = fidelitySchema.safeParse(body.fidelity ?? "strict");
-  if (!parsedFidelity.success) {
-    return NextResponse.json(
-      { error: "样本还原度无效", issues: parsedFidelity.error.issues },
-      { status: 400 },
-    );
-  }
-
-  const parsed = imageGenerationRequestSchema.safeParse({
-    ...body,
-    fidelity: parsedFidelity.data,
-  });
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "效果图生成信息不完整", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
+  const parsed = imageGenerationRequestSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "效果图生成信息不完整或样本还原度无效" }, { status: 400 });
   try {
-    const result = await generateEffectImage({
-      roomImageUrl: parsed.data.roomImageUrl,
-      styleImageUrl: parsed.data.styleImageUrl,
-      detailImageUrl: parsed.data.detailImageUrl,
-      optimizedPrompt: parsed.data.optimizedPrompt,
-      negativePrompt: parsed.data.negativePrompt,
-      fidelity: parsed.data.fidelity,
-      imageAnalysis: parsed.data.imageAnalysis,
-      referenceImageUrl: parsed.data.referenceImageUrl,
-    });
-
-    await db.generationRecord.create({
-      data: {
-        merchantId: session.merchantId,
-        planId: parsed.data.planId,
-        type: "image_generation",
-        inputSummary: result.inputSummary,
-        status: "succeeded",
-        usageUnits: 1,
-      },
-    });
-
-    return NextResponse.json(result);
-  } catch (error) {
-    return aiErrorResponse(error, "AI 效果图生成暂时失败，请稍后重试");
-  }
+    return NextResponse.json(await startImageJob(session.merchantId, parsed.data), { status: 202 });
+  } catch (error) { return aiErrorResponse(error, "AI 任务提交失败，请稍后重试"); }
 }

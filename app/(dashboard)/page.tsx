@@ -108,6 +108,7 @@ export default function WorkbenchPage() {
   const [detailImageUrl, setDetailImageUrl] = useState(demoDetailImageUrl);
   const [imageAnalysis, setImageAnalysis] = useState<MaterialAnalysis | null>(null);
   const [imageUrl, setImageUrl] = useState("");
+  const [imageJobId, setImageJobId] = useState("");
   const [shortVideoScript, setShortVideoScript] = useState("");
   const [socialCopy, setSocialCopy] = useState("");
   const [customerScript, setCustomerScript] = useState("");
@@ -123,6 +124,54 @@ export default function WorkbenchPage() {
   const [customerTab, setCustomerTab] = useState<CustomerTab>("effect");
   const frameRef = useRef<HTMLDivElement>(null);
   const inputReady = Boolean(roomImageUrl && styleImageUrl && detailImageUrl);
+
+  useEffect(() => {
+    let stopped = false;
+    const saved = localStorage.getItem("image-generation-job");
+    if (saved) { void Promise.resolve().then(() => { if (!stopped) { setImageJobId(saved); setBusyAction("generate"); } }); }
+    else { void fetch("/api/ai/generate-image", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(job => {
+      if (!stopped && job?.jobId) { localStorage.setItem("image-generation-job", job.jobId); setImageJobId(job.jobId); setBusyAction("generate"); }
+    }).catch(() => undefined); }
+    return () => { stopped = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!imageJobId) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let restored = false;
+    async function poll() {
+      try {
+        const response = await fetch(`/api/ai/generate-image/${encodeURIComponent(imageJobId)}`, { cache: "no-store" });
+        const job = await response.json();
+        if (stopped) return;
+        if (response.status === 401 || response.status === 404) throw new Error(job.error || "任务无法访问");
+        if (!response.ok) { setActionNotice("查询暂时失败，将自动继续查询；无需重复生成"); timer = setTimeout(poll, 10000); return; }
+        if (!restored && job.input) {
+          setRoomImageUrl(job.input.roomImageUrl); setStyleImageUrl(job.input.styleImageUrl); setDetailImageUrl(job.input.detailImageUrl);
+          setPrompt(job.input.optimizedPrompt); setOriginalPrompt(job.input.optimizedPrompt);
+          setNegativePrompt(job.input.negativePrompt || ""); setFidelity(job.input.fidelity);
+          setImageAnalysis(job.input.imageAnalysis ? JSON.parse(job.input.imageAnalysis) : null);
+          clearResult(); restored = true;
+        }
+        if (job.status === "failed") throw new Error(job.error || "生成失败，请重试");
+        if (job.status === "succeeded") {
+          if (!job.imageUrl) throw new Error("未收到效果图");
+          clearResult(); setImageUrl(job.imageUrl); setActiveStep(2);
+          localStorage.removeItem("image-generation-job"); setImageJobId(""); setBusyAction(null); return;
+        }
+        setActionNotice(`效果图正在生成，已等待 ${job.elapsedSeconds || 0} 秒。可以刷新页面后继续查看。`);
+        timer = setTimeout(poll, 5000);
+      } catch (error) {
+        if (stopped) return;
+        if (error instanceof TypeError) { timer = setTimeout(poll, 10000); return; }
+        setActionError(error instanceof Error ? error.message : "查询失败");
+        localStorage.removeItem("image-generation-job"); setImageJobId(""); setBusyAction(null);
+      }
+    }
+    void poll();
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [imageJobId]);
 
   function clearResult() {
     setImageUrl("");
@@ -193,6 +242,9 @@ export default function WorkbenchPage() {
   }
 
   async function uploadImage(file: File, target: "room" | "style" | "detail") {
+    if (!/\.(jpe?g|png|webp)$/i.test(file.name) || !file.size || file.size > 4 * 1024 * 1024) {
+      setUploadError("请选择 JPG、PNG 或 WebP 图片，单张不超过 4MB"); return;
+    }
     if (busyAction) return;
     setBusyAction(`upload-${target}`);
     setUploadError("");
@@ -267,7 +319,7 @@ export default function WorkbenchPage() {
     setBusyAction("generate");
     setActionError("");
     try {
-      const result = await postJson<{ imageUrl: string; inputSummary: string }>(
+      const result = await postJson<{ jobId: string }>(
         "/api/ai/generate-image",
         {
           roomImageUrl,
@@ -280,16 +332,17 @@ export default function WorkbenchPage() {
           referenceImageUrl,
         },
       );
-      if (!result.imageUrl) throw new Error("未收到效果图，请重试");
+      if (!result.jobId) throw new Error("未收到任务编号，请重试");
       clearResult();
-      setImageUrl(result.imageUrl);
-      setActiveStep(2);
+      localStorage.setItem("image-generation-job", result.jobId);
+      setImageJobId(result.jobId);
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : "效果图生成失败，请重试",
       );
     } finally {
-      setBusyAction(null);
+      // Polling owns the busy state once a task has been accepted.
+      if (!localStorage.getItem("image-generation-job")) setBusyAction(null);
     }
   }
 
@@ -408,6 +461,7 @@ export default function WorkbenchPage() {
   return (
     <div className="studio-page flex min-h-[calc(100dvh-58px)] items-center justify-center">
       <div ref={frameRef} className="mobile-studio-frame">
+        {(activeStep === 0 && (actionNotice || actionError)) || (activeStep === 1 && actionNotice && !actionError) ? <p role={actionError ? "alert" : "status"} className="p-3 text-sm text-stone-700">{actionError || actionNotice}</p> : null}
         <div className="relative h-full min-h-0 flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             {activeStep === 0 ? (
@@ -736,7 +790,7 @@ function EditorView({
               <input
                 ref={roomFileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 aria-label="上传客户空间图片"
                 disabled={busyAction !== null}
                 className="sr-only"
@@ -813,7 +867,7 @@ function EditorView({
             <input
               ref={styleFileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               aria-label="上传整体款式图片"
               disabled={busyAction !== null}
               className="sr-only"
@@ -826,7 +880,7 @@ function EditorView({
             <input
               ref={detailFileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               aria-label="上传材质细节图片"
               disabled={busyAction !== null}
               className="sr-only"
@@ -1123,7 +1177,7 @@ function RequirementsView({
             <Sparkles size={16} strokeWidth={1.5} className="text-sand" />
           </button>
         </div>
-        {busyAction === "generate" && <p role="status" className="mt-2 text-center text-xs text-stone-600">图片生成可能需要 1–3 分钟，请保持页面打开，无需重复点击。</p>}
+        {busyAction === "generate" && <p role="status" className="mt-2 text-center text-xs text-stone-600">任务已提交，生成期间可以刷新页面后继续查看，无需重复点击。</p>}
       </div>
     </div>
   );

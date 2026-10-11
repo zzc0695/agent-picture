@@ -84,6 +84,34 @@ function providerErrorMessage(body: unknown, status: number) {
   return "图片生成失败：" + code + (message ? " " + message : "");
 }
 
+function imageApiBase() {
+  return process.env.DASHSCOPE_BASE_URL ?? "https://dashscope.aliyuncs.com";
+}
+
+export async function submitBailianImage(apiKey: string, model: string, content: BailianContentPart[], options: BailianImageOptions = {}) {
+  const response = await fetch(`${imageApiBase()}/api/v1/services/aigc/image-generation/generation`, {
+    method: "POST", signal: AbortSignal.timeout(45_000),
+    headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json", "X-DashScope-Async": "enable" },
+    body: JSON.stringify({ model, input: { messages: [{ role: "user", content }] }, parameters: {
+      size: "1024*1024", n: 1, negative_prompt: options.negativePrompt || undefined, prompt_extend: false, watermark: false,
+    } }),
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(providerErrorMessage(body, response.status));
+  if (typeof body.output?.task_id !== "string" || !body.output.task_id) throw new Error("图片接口没有返回任务编号");
+  return body.output.task_id as string;
+}
+
+export async function getBailianImageTask(apiKey: string, taskId: string) {
+  const response = await fetch(`${imageApiBase()}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
+    headers: { Authorization: "Bearer " + apiKey }, signal: AbortSignal.timeout(15_000), cache: "no-store",
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(providerErrorMessage(body, response.status));
+  const status: string = body.output?.task_status ?? "UNKNOWN";
+  return { status, imageUrl: status === "SUCCEEDED" ? extractBailianImageUrl(body) : undefined };
+}
+
 export async function generateBailianImage(
   apiKey: string,
   model: string,

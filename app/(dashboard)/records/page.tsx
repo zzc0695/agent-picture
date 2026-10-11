@@ -1,4 +1,5 @@
 import { Activity, AlertCircle } from "lucide-react";
+import Link from "next/link";
 import { requirePageMerchantSession } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
 
@@ -30,12 +31,16 @@ export default async function RecordsPage() {
                       {record.type}
                     </h2>
                     <span className="rounded-full bg-white/65 px-3 py-1 text-[11px] font-medium text-stone-500 shadow-sm">
-                      {record.status} · 消耗 {record.usageUnits}
+                      {({ submitting: "提交中", running: "生成中", succeeded: "成功", failed: "失败" } as Record<string, string>)[record.status] ?? record.status} · 成功计数 {record.usageUnits}
                     </span>
                   </div>
                   <p className="mt-3 text-[13px] leading-7 text-stone-600">
                     {record.inputSummary}
                   </p>
+                  {record.timings && typeof record.timings === "object" && !Array.isArray(record.timings) && typeof record.timings.totalMs === "number" ? (
+                    <p className="mt-2 text-xs text-stone-500">总耗时 {(record.timings.totalMs / 1000).toFixed(1)} 秒</p>
+                  ) : null}
+                  {record.status === "running" ? <Link href="/" className="mt-2 inline-block text-sm text-sage underline">返回工作台查看进度</Link> : null}
                   {record.failureReason ? (
                     <p className="mt-3 flex items-start gap-2 rounded-2xl bg-red-50 px-3 py-2 text-[13px] leading-6 text-red-700">
                       <AlertCircle size={15} className="mt-1 flex-shrink-0" />

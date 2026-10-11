@@ -6,9 +6,23 @@ import {
   extractChatCompletionText,
   generateBailianImage,
   getBailianConfig,
+  submitBailianImage,
+  getBailianImageTask,
 } from "@/lib/ai/bailian";
 
 describe("Bailian provider", () => {
+  it("submits to the asynchronous endpoint and returns a task ID", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ output: { task_id: "task-1", task_status: "PENDING" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await submitBailianImage("key", "qwen-image-3.0", [{ text: "窗帘" }])).toBe("task-1");
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/image-generation/generation"), expect.objectContaining({
+      headers: expect.objectContaining({ "X-DashScope-Async": "enable" }),
+    }));
+  });
+  it("extracts the result of a completed asynchronous task", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ output: { task_status: "SUCCEEDED", choices: [{ message: { content: [{ image: "https://example.com/result.png" }] } }] } })));
+    expect(await getBailianImageTask("key", "task-1")).toEqual({ status: "SUCCEEDED", imageUrl: "https://example.com/result.png" });
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
   });

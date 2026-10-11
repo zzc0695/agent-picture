@@ -89,6 +89,11 @@ model GenerationRecord {
   inputSummary  String
   status        String
   failureReason String?
+  providerTaskId String?
+  resultImageUrl String?
+  inputData     Json?
+  timings       Json?
+  leaseUntil    DateTime?
   usageUnits    Int           @default(1)
   createdAt     DateTime      @default(now())
   merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)

@@ -9,7 +9,7 @@ import {
   toBailianImageReference,
 } from "@/lib/files/storage";
 
-export async function generateEffectImage(input: {
+export async function prepareImageGeneration(input: {
   roomImageUrl: string;
   styleImageUrl: string;
   detailImageUrl: string;
@@ -47,25 +47,29 @@ export async function generateEffectImage(input: {
 
   content.push({ text: prompt });
 
+  return { config, content, inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120) };
+}
+
+export async function persistEffectImage(temporaryImageUrl: string) {
+  const imageResponse = await fetch(temporaryImageUrl, { signal: AbortSignal.timeout(30_000) });
+  if (!imageResponse.ok || !imageResponse.headers.get("content-type")?.startsWith("image/")) {
+    throw new Error("无法下载图片生成结果");
+  }
+  return saveGeneratedImage(Buffer.from(await imageResponse.arrayBuffer()), "png");
+}
+
+export async function generateEffectImage(input: Parameters<typeof prepareImageGeneration>[0]) {
+  const { config, content, inputSummary } = await prepareImageGeneration(input);
   const temporaryImageUrl = await generateBailianImage(
-    config.apiKey,
+    config.apiKey!,
     config.imageModel,
     content,
     { negativePrompt: input.negativePrompt },
   );
-  const imageResponse = await fetch(temporaryImageUrl, { signal: AbortSignal.timeout(30_000) });
-
-  if (!imageResponse.ok) {
-    throw new Error("无法下载图片生成结果");
-  }
-
-  const imageUrl = await saveGeneratedImage(
-    Buffer.from(await imageResponse.arrayBuffer()),
-    "png",
-  );
+  const imageUrl = await persistEffectImage(temporaryImageUrl);
 
   return {
     imageUrl,
-    inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120),
+    inputSummary,
   };
 }

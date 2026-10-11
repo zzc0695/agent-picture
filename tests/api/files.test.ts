@@ -15,6 +15,7 @@ vi.mock("@/lib/auth/require-session", () => ({
 }));
 
 vi.mock("@/lib/files/storage", () => ({
+  MAX_IMAGE_BYTES: 4 * 1024 * 1024,
   isSupportedImageFile: vi.fn(() => true),
   saveUploadedFile: vi.fn(async () => "/uploads/room.png"),
 }));
@@ -60,5 +61,12 @@ describe("files API", () => {
       url: "/uploads/room.png",
     });
     expect(saveUploadedFile).toHaveBeenCalledTimes(1);
+  });
+  it("rejects empty and oversized uploads before storing them", async () => {
+    for (const bytes of [0, 4 * 1024 * 1024 + 1]) {
+      const response = await POST(formRequest(new Blob([new Uint8Array(bytes)], { type: "image/png" })));
+      expect(response.status).toBe(400);
+    }
+    expect(saveUploadedFile).not.toHaveBeenCalled();
   });
 });

@@ -43,7 +43,7 @@ describe("generateEffectImage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(Buffer.from("generated-image"), { status: 200 }),
+        new Response(Buffer.from("generated-image"), { status: 200, headers: { "Content-Type": "image/png" } }),
       ),
     );
 
@@ -111,7 +111,7 @@ describe("generateEffectImage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(Buffer.from("generated-image"), { status: 200 }),
+        new Response(Buffer.from("generated-image"), { status: 200, headers: { "Content-Type": "image/png" } }),
       ),
     );
     const { generateEffectImage } = await import("@/lib/ai/image");

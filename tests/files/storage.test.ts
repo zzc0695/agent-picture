@@ -40,6 +40,12 @@ describe("file storage", () => {
 
     expect(isSupportedImageFile(file)).toBe(true);
   });
+  it("rejects unsupported formats and mismatched MIME types", async () => {
+    const { isSupportedImageFile } = await import("@/lib/files/storage");
+    expect(isSupportedImageFile(new File(["bytes"], "room.gif", { type: "image/gif" }))).toBe(false);
+    expect(isSupportedImageFile(new File(["bytes"], "room.png", { type: "image/svg+xml" }))).toBe(false);
+    expect(isSupportedImageFile(new File(["bytes"], "room.webp", { type: "image/webp" }))).toBe(true);
+  });
 
   it("saves generated image bytes under the upload root", async () => {
     const { saveGeneratedImage } = await import("@/lib/files/storage");
@@ -138,7 +144,7 @@ describe("file storage", () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       "https://example.public.blob.vercel-storage.com/uploads/room.png",
-      { cache: "no-store" },
+      expect.objectContaining({ cache: "no-store", signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -177,6 +183,6 @@ describe("file storage", () => {
       toBailianImageReference(
         "https://example.public.blob.vercel-storage.com/uploads/room.jpg",
       ),
-    ).rejects.toThrow("单张图片不能超过 7MB");
+    ).rejects.toThrow("单张图片不能超过 4MB");
   });
 });

@@ -30,10 +30,12 @@ function mockApiResponses(options: { planError?: string; generationError?: strin
       });
     }
 
+    if (url.endsWith("/api/ai/generate-image") && (!init || init.method !== "POST")) return Response.json({ jobId: null });
+    if (url.includes("/api/ai/generate-image/")) return Response.json({ status: "succeeded", imageUrl: "/uploads/generated-effect.png" });
     if (url.endsWith("/api/ai/generate-image")) {
       if (options.generationError) return Response.json({ error: options.generationError }, { status: 502 });
       return Response.json({
-        imageUrl: "/uploads/generated-effect.png",
+        jobId: "job-test",
         inputSummary: "balanced: 优化后的窗帘效果图提示词",
       });
     }
@@ -76,6 +78,7 @@ function mockApiResponses(options: { planError?: string; generationError?: strin
 
 describe("WorkbenchPage", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.restoreAllMocks();
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
@@ -88,6 +91,15 @@ describe("WorkbenchPage", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
       () => undefined,
     );
+  });
+
+  it("resumes a saved image task after reloading without resubmitting", async () => {
+    localStorage.setItem("image-generation-job", "saved-job");
+    const fetchMock = mockApiResponses();
+    render(<WorkbenchPage />);
+    expect(await screen.findByAltText("生成效果图")).toHaveAttribute("src", "/uploads/generated-effect.png");
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/api/ai/generate-image") && init?.method === "POST")).toBe(false);
+    expect(localStorage.getItem("image-generation-job")).toBeNull();
   });
 
   it("renders the AI studio proposal flow from the new design reference", async () => {
@@ -114,7 +126,7 @@ describe("WorkbenchPage", () => {
     expect(screen.getByText("模板库")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    expect(screen.getByText("效果呈现")).toBeInTheDocument();
+    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
     expect(screen.getByAltText("生成效果图")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "保存方案" }));
@@ -224,8 +236,8 @@ describe("WorkbenchPage", () => {
     await user.click(screen.getByRole("button", { name: "生成方案效果" }));
     expect(await screen.findByText("效果呈现")).toBeInTheDocument();
 
-    const generationCall = fetchMock.mock.calls.find(([input]) =>
-      String(input).endsWith("/api/ai/generate-image"),
+    const generationCall = fetchMock.mock.calls.find(([input, init]) =>
+      String(input).endsWith("/api/ai/generate-image") && init?.method === "POST",
     );
     expect(JSON.parse(String(generationCall?.[1]?.body))).toEqual(
       expect.objectContaining({
@@ -338,7 +350,7 @@ describe("WorkbenchPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "数据库暂时不可用",
     );
-    expect(screen.getByText("效果呈现")).toBeInTheDocument();
+    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
   });
 
   it("uses the final edited prompt after optimization and saves the actual customer and input", async () => {
@@ -356,7 +368,7 @@ describe("WorkbenchPage", () => {
     await user.type(screen.getByLabelText("生成要求"), "蓝色窗帘，保留书桌");
     await user.click(screen.getByRole("button", { name: "生成方案效果" }));
     await user.click(await screen.findByRole("button", { name: "保存方案" }));
-    const generation = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/generate-image"));
+    const generation = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/generate-image") && init?.method === "POST");
     expect(JSON.parse(String(generation?.[1]?.body))).toMatchObject({ optimizedPrompt: "蓝色窗帘，保留书桌", negativePrompt: "" });
     const save = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/plans"));
     expect(JSON.parse(String(save?.[1]?.body))).toMatchObject({ customerName: "李先生", notes: "卧室窗帘方案", originalPrompt: "蓝色窗帘，保留书桌", optimizedPrompt: "蓝色窗帘，保留书桌" });
@@ -373,7 +385,7 @@ describe("WorkbenchPage", () => {
     await user.click(screen.getByRole("button", { name: "插入到当前" }));
     const finalText = (screen.getByLabelText("生成要求") as HTMLTextAreaElement).value;
     await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/generate-image"));
+    const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/generate-image") && init?.method === "POST");
     expect(JSON.parse(String(call?.[1]?.body)).optimizedPrompt).toBe(finalText);
     expect(finalText).toContain("现代简约风格窗帘");
   });

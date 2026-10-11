@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { put } from "@vercel/blob";
 
-const MAX_BAILIAN_IMAGE_BYTES = 7 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const BAILIAN_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -22,11 +22,9 @@ function storageRoot() {
 }
 
 export function isSupportedImageFile(file: File) {
-  if (file.type.startsWith("image/")) return true;
-
-  return [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(
-    path.extname(file.name).toLowerCase(),
-  );
+  const ext = path.extname(file.name).toLowerCase();
+  return [".jpg", ".jpeg", ".png", ".webp"].includes(ext) &&
+    (!file.type || file.type === contentTypeForExtension(ext));
 }
 
 function isBlobStorageEnabled() {
@@ -64,6 +62,8 @@ async function saveBlobUpload(
 }
 
 export async function saveUploadedFile(file: File) {
+  if (!isSupportedImageFile(file)) throw new MaterialImageInputError("图片格式不支持，请使用 JPG、PNG 或 WebP");
+  if (!file.size || file.size > MAX_IMAGE_BYTES) throw new MaterialImageInputError("请选择非空且不超过 4MB 的图片");
   const bytes = Buffer.from(await file.arrayBuffer());
   const extension = path.extname(file.name) || ".jpg";
   const fileName = `${crypto.randomUUID()}${extension}`;
@@ -141,8 +141,8 @@ function validatedImageDataUrl(bytes: Buffer, contentType: string) {
     );
   }
 
-  if (bytes.byteLength > MAX_BAILIAN_IMAGE_BYTES) {
-    throw new MaterialImageInputError("单张图片不能超过 7MB");
+  if (bytes.byteLength > MAX_IMAGE_BYTES) {
+    throw new MaterialImageInputError("单张图片不能超过 4MB");
   }
 
   return `data:${normalizedType};base64,${bytes.toString("base64")}`;
@@ -164,7 +164,7 @@ async function readVercelBlobImage(imageUrl: string) {
   let response: Response;
 
   try {
-    response = await fetch(imageUrl, { cache: "no-store" });
+    response = await fetch(imageUrl, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
   } catch {
     throw new MaterialImageInputError("参考图片读取失败，请稍后重试");
   }
@@ -175,8 +175,8 @@ async function readVercelBlobImage(imageUrl: string) {
 
   const contentType = response.headers.get("content-type") ?? "";
   const declaredSize = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredSize) && declaredSize > MAX_BAILIAN_IMAGE_BYTES) {
-    throw new MaterialImageInputError("单张图片不能超过 7MB");
+  if (Number.isFinite(declaredSize) && declaredSize > MAX_IMAGE_BYTES) {
+    throw new MaterialImageInputError("单张图片不能超过 4MB");
   }
 
   return validatedImageDataUrl(

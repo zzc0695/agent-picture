@@ -30,6 +30,17 @@ BLOB_READ_WRITE_TOKEN="vercel_blob_rw_..."
 `LOCAL_FILE_ROOT` is only for local development when `BLOB_READ_WRITE_TOKEN` is
 not set.
 
+Image generation now submits a DashScope asynchronous task and polls its result.
+The default API base is `https://dashscope.aliyuncs.com`; set `DASHSCOPE_BASE_URL`
+to the regional workspace domain when required by your account. The API key,
+model and endpoint must belong to the same region.
+The additive migration `20261012020000_async_image_jobs` stores provider task IDs,
+input snapshots, saved image URLs, processing leases and stage timings on generation records.
+Preview builds apply migrations through the existing build command; verify the
+database target before deployment. Uploads accept JPG, PNG and WebP up to 4MB.
+Only successful image jobs increment the displayed successful count; this count
+is not a provider billing report. A failed or expired task may still incur provider charges.
+
 The model names above match the defaults in `lib/ai/bailian.ts`; configure models
 available to your DashScope account. If the key is absent, AI endpoints return a
 503 error. The app does not present stock text or the input photo as AI output.
