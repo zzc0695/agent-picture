@@ -13,7 +13,8 @@ export async function PATCH(
   const session = await requireMerchantSession();
   if (!session) return unauthorizedResponse();
   const { id } = await params;
-  const parsed = materialSchema.partial().safeParse(await request.json());
+  const body = await request.json();
+  const parsed = materialSchema.partial().safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "素材信息不完整", issues: parsed.error.issues },
@@ -21,11 +22,10 @@ export async function PATCH(
     );
   }
 
-  const material = await db.material.update({
-    where: { id, merchantId: session.merchantId },
-    data: parsed.data,
-  });
-
+  const data = Object.fromEntries(Object.entries(parsed.data).filter(([key]) => key in body));
+  const changed = await db.material.updateMany({ where: { id, merchantId: session.merchantId }, data });
+  if (!changed.count) return NextResponse.json({ error: "素材不存在" }, { status: 404 });
+  const material = await db.material.findFirst({ where: { id, merchantId: session.merchantId } });
   return NextResponse.json({ material });
 }
 
@@ -36,7 +36,6 @@ export async function DELETE(
   const session = await requireMerchantSession();
   if (!session) return unauthorizedResponse();
   const { id } = await params;
-  await db.material.delete({ where: { id, merchantId: session.merchantId } });
-
-  return NextResponse.json({ ok: true });
+  const deleted = await db.material.deleteMany({ where: { id, merchantId: session.merchantId } });
+  return deleted.count ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "素材不存在" }, { status: 404 });
 }

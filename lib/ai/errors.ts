@@ -5,6 +5,8 @@ export class AiUnavailableError extends Error {
   }
 }
 
+export class AiResourceNotFoundError extends Error {}
+
 export function parseJsonOutput(text: string): unknown {
   return JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
 }

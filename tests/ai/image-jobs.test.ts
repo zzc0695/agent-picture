@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { getBailianImageTask, submitBailianImage } from "@/lib/ai/bailian";
 import { persistEffectImage } from "@/lib/ai/image";
 vi.mock("@/lib/usage", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/usage")>(), reserveUsage: vi.fn(async (input) => db.generationRecord.create({ data: { ...input, status: "submitting", usageUnits: 0 } })) }));
-vi.mock("@/lib/db", () => ({ db: { generationRecord: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }, customerPlan: { findFirst: vi.fn() } } }));
+vi.mock("@/lib/db", () => ({ db: { generationRecord: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }, customerPlan: { findFirst: vi.fn() }, material: { count: vi.fn() } } }));
 vi.mock("@/lib/ai/bailian", () => ({ getBailianConfig: () => ({ apiKey: "key" }), submitBailianImage: vi.fn(), getBailianImageTask: vi.fn() }));
 vi.mock("@/lib/ai/image", () => ({ prepareImageGeneration: vi.fn(async () => ({ config: { apiKey: "key", imageModel: "model" }, content: [] })), persistEffectImage: vi.fn() }));
 const job = { id: "job", merchantId: "m", type: "image_generation", status: "running", providerTaskId: "provider", createdAt: new Date(), inputSummary: "prompt", timings: { referenceMs: 1 } };
@@ -17,6 +17,12 @@ describe("durable image jobs", () => {
     expect(await pollImageJob("other", "job")).toBeNull();
     expect(db.generationRecord.findFirst).toHaveBeenCalledWith({ where: { id: "job", merchantId: "other", type: "image_generation" } });
     expect(getBailianImageTask).not.toHaveBeenCalled();
+  });
+  it("rejects another account's selected material before creating or submitting a task", async () => {
+    vi.mocked(db.material.count).mockResolvedValueOnce(0);
+    await expect(startImageJob("m", { ...input, detailMaterialId: "other_material" })).rejects.toThrow("素材不存在");
+    expect(db.material.count).toHaveBeenCalledWith({ where: { id: { in: ["other_material"] }, merchantId: "m" } });
+    expect(db.generationRecord.create).not.toHaveBeenCalled(); expect(submitBailianImage).not.toHaveBeenCalled();
   });
   it("returns a saved result without contacting or charging the provider again", async () => {
     vi.mocked(db.generationRecord.findFirst).mockResolvedValue({ ...job, status: "succeeded", resultImageUrl: "/uploads/result.png" } as never);

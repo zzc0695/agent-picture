@@ -31,6 +31,7 @@ export async function POST(request: Request) {
   }
 
   const input = parsed.data;
+  if (input.sourcePlanId && !await db.customerPlan.findFirst({ where: { id: input.sourcePlanId, merchantId: session.merchantId } })) return NextResponse.json({ error: "原方案不存在" }, { status: 404 });
   const customer = await ownedCustomer(session.merchantId, input.customerId);
   if (input.customerId && !customer) return NextResponse.json({ error: "客户不存在" }, { status: 404 });
   if (input.materialIds.length && await db.material.count({ where: { id: { in: input.materialIds }, merchantId: session.merchantId } }) !== new Set(input.materialIds).size) {
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
   const plan = await db.customerPlan.create({
     data: {
       merchantId: session.merchantId,
+      sourcePlanId: input.sourcePlanId || null,
       customerName: customer?.name ?? input.customerName,
       customerId: customer?.id ?? null,
       notes: input.notes,

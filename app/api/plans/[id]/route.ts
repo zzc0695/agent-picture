@@ -49,6 +49,7 @@ export async function PATCH(
     Object.entries(input).filter(([key]) => key in body),
   );
   delete planInput.materialIds;
+  delete planInput.sourcePlanId;
   const customer = await ownedCustomer(session.merchantId, input.customerId);
   if (input.customerId && !customer) return NextResponse.json({ error: "客户不存在" }, { status: 404 });
   if (customer) planInput.customerName = customer.name;

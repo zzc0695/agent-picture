@@ -28,7 +28,7 @@ export default async function RecordsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-serif text-[18px] font-medium text-stone-800">
-                      {record.type}
+                      {({ image_generation: "效果图", material_analysis: "图片识别", prompt_optimization: "要求润色", marketing_copy: "营销文案" } as Record<string, string>)[record.type] ?? record.type}
                     </h2>
                     <span className="rounded-full bg-white/65 px-3 py-1 text-[11px] font-medium text-stone-500 shadow-sm">
                       {({ submitting: "提交中", running: "生成中", succeeded: "成功", failed: "失败" } as Record<string, string>)[record.status] ?? record.status} · 成功计数 {record.usageUnits}
@@ -41,6 +41,7 @@ export default async function RecordsPage() {
                     <p className="mt-2 text-xs text-stone-500">总耗时 {(record.timings.totalMs / 1000).toFixed(1)} 秒</p>
                   ) : null}
                   {record.status === "running" ? <Link href="/" className="mt-2 inline-block text-sm text-sage underline">返回工作台查看进度</Link> : null}
+                  {record.type === "image_generation" && record.status === "succeeded" && record.resultImageUrl ? <div className="mt-3 flex gap-4 text-sm"><Link href={`/?jobId=${record.id}`} className="text-sage underline">找回效果图 / 继续制作</Link><a href={`/api/files/download?url=${encodeURIComponent(record.resultImageUrl)}`} className="text-sage underline">下载效果图</a></div> : null}
                   {record.failureReason ? (
                     <p className="mt-3 flex items-start gap-2 rounded-2xl bg-red-50 px-3 py-2 text-[13px] leading-6 text-red-700">
                       <AlertCircle size={15} className="mt-1 flex-shrink-0" />

@@ -37,6 +37,7 @@ const storedPlan = {
   merchantId: "merchant_1",
   customerName: "王女士",
   customerId: null,
+  sourcePlanId: null,
   shareToken: null,
   shareExpiresAt: null,
   notes: "",
@@ -62,13 +63,29 @@ const storedPlan = {
 describe("plans API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(db.customerPlan.findFirst).mockResolvedValue(storedPlan);
+    vi.mocked(db.customerPlan.findFirst).mockReset().mockResolvedValue(storedPlan);
   });
 
   it("rejects editing another merchant's plan", async () => {
     vi.mocked(db.customerPlan.findFirst).mockResolvedValueOnce(null);
     expect((await PATCH(jsonRequest({ notes: "changed" }), { params: Promise.resolve({ id: "other" }) })).status).toBe(404);
     expect(db.customerPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("creates a version linked to an owned source without updating the source", async () => {
+    vi.mocked(db.customerPlan.create).mockResolvedValueOnce({ ...storedPlan, id: "version", sourcePlanId: "plan_1" });
+    const response = await POST(jsonRequest({ ...storedPlan, primaryImageUrl: "/uploads/new.png", shortVideoScript: "", socialCopy: "", customerScript: "", sourcePlanId: "plan_1" }));
+    expect(response.status).toBe(201);
+    expect(db.customerPlan.findFirst).toHaveBeenCalledWith({ where: { id: "plan_1", merchantId: "merchant_1" } });
+    expect(db.customerPlan.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ sourcePlanId: "plan_1", primaryImageUrl: "/uploads/new.png" }) }));
+    expect(db.customerPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("cannot link a new version to another merchant's plan", async () => {
+    vi.mocked(db.customerPlan.findFirst).mockResolvedValueOnce(null);
+    const response = await POST(jsonRequest({ ...storedPlan, primaryImageUrl: "", shortVideoScript: "", socialCopy: "", customerScript: "", sourcePlanId: "other" }));
+    expect(response.status).toBe(404);
+    expect(db.customerPlan.create).not.toHaveBeenCalled();
   });
 
   it("rejects associating another merchant's customer", async () => {

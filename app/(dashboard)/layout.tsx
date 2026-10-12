@@ -6,7 +6,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requirePageMerchantSession();
+  const session = await requirePageMerchantSession();
 
-  return <AppShell>{children}</AppShell>;
+  return <AppShell accountEmail={session.email}>{children}</AppShell>;
 }

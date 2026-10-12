@@ -1,18 +1,22 @@
 import { db } from "@/lib/db";
 import { getBailianConfig, getBailianImageTask, submitBailianImage } from "./bailian";
 import { prepareImageGeneration, persistEffectImage } from "./image";
-import { AiUnavailableError } from "./errors";
+import { AiUnavailableError, AiResourceNotFoundError } from "./errors";
 import { imageGenerationRequestSchema } from "@/lib/validators";
 import type { GenerationRecord } from "@prisma/client";
 import { reserveUsage } from "@/lib/usage";
 
 function view(job: GenerationRecord) {
   return { jobId: job.id, status: job.status, imageUrl: job.resultImageUrl, inputSummary: job.inputSummary,
+    sourcePlanId: job.planId,
     input: job.inputData, error: job.failureReason, elapsedSeconds: Math.round((Date.now() - job.createdAt.getTime()) / 1000) };
 }
 export async function startImageJob(merchantId: string, body: unknown) {
   const input = imageGenerationRequestSchema.parse(body);
-  if (input.planId && !await db.customerPlan.findFirst({ where: { id: input.planId, merchantId } })) throw new Error("客户方案不存在");
+  input.materialIds = [...new Set([...input.materialIds, input.styleMaterialId, input.detailMaterialId].filter(Boolean))];
+  if (input.planId && !await db.customerPlan.findFirst({ where: { id: input.planId, merchantId } })) throw new AiResourceNotFoundError("客户方案不存在");
+  if (input.customerId && !await db.customer.findFirst({ where: { id: input.customerId, merchantId } })) throw new AiResourceNotFoundError("客户不存在");
+  if (input.materialIds.length && await db.material.count({ where: { id: { in: input.materialIds }, merchantId } }) !== new Set(input.materialIds).size) throw new AiResourceNotFoundError("素材不存在");
   const job = await reserveUsage({ merchantId, planId: input.planId, type: "image_generation",
     inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120), inputData: input });
   const started = Date.now();

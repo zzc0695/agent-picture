@@ -42,9 +42,17 @@ export const imageGenerationRequestSchema = z.object({
   imageAnalysis: z.string().default(""),
   referenceImageUrl: z.string().min(1).optional(),
   planId: z.string().min(1).optional(),
+  customerId: z.string().min(1).nullable().optional(),
+  customerName: z.string().max(80).default(""),
+  planName: z.string().max(200).default(""),
+  originalPrompt: z.string().default(""),
+  styleMaterialId: z.string().default(""),
+  detailMaterialId: z.string().default(""),
+  materialIds: z.array(z.string()).default([]),
 });
 
 export const planSchema = z.object({
+  sourcePlanId: z.string().min(1).nullable().optional(),
   customerId: z.string().min(1).nullable().optional(),
   customerName: z.string().min(1),
   notes: z.string().default(""),

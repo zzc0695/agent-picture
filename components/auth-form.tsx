@@ -12,6 +12,7 @@ export function AuthForm({ register = false }: { register?: boolean }) {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) { setError(data.error || "服务暂时不可用，请稍后重试"); return; }
       localStorage.removeItem("image-generation-job");
+      localStorage.removeItem("last-image-result");
       router.replace(register || data.needsWelcome ? "/welcome" : "/"); router.refresh();
     } catch { setError("网络连接失败，请检查网络后重试"); } finally { setPending(false); }
   }

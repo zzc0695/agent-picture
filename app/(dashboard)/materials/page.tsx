@@ -1,6 +1,7 @@
 import { MaterialCard } from "@/components/material-card";
 import { requirePageMerchantSession } from "@/lib/auth/require-session";
 import { db } from "@/lib/db";
+import { MaterialCreateForm } from "@/components/material-create-form";
 
 export default async function MaterialsPage() {
   const session = await requirePageMerchantSession();
@@ -16,6 +17,7 @@ export default async function MaterialsPage() {
         title="素材库"
         description="查看窗帘、布料、五金和软装样本的图片及产品信息。"
       />
+      <MaterialCreateForm />
       {materials.length ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {materials.map((material) => (

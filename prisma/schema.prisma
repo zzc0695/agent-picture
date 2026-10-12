@@ -49,6 +49,9 @@ model PromptTemplate {
 
 model CustomerPlan {
   id               String             @id @default(cuid())
+  sourcePlanId     String?
+  sourcePlan       CustomerPlan?      @relation("PlanVersions", fields: [sourcePlanId], references: [id], onDelete: SetNull)
+  versions         CustomerPlan[]     @relation("PlanVersions")
   merchantId       String
   customerName     String
   customerId       String?
@@ -76,6 +79,7 @@ model CustomerPlan {
   merchant         Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   materials        PlanMaterial[]
   records          GenerationRecord[]
+  @@index([sourcePlanId])
 }
 
 model PlanMaterial {

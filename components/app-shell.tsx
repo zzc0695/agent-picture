@@ -22,7 +22,7 @@ const navItems = [
   { href: "/welcome", label: "使用指南", icon: CircleHelp },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, accountEmail }: { children: React.ReactNode; accountEmail?: string }) {
   return (
     <div className="studio-app">
       <div className="studio-noise" />
@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
           <LogoutButton />
         </nav>
-        <main className="studio-main">{children}</main>
+        <main className="studio-main">{accountEmail && <p className="px-4 pt-3 text-xs text-stone-500">当前账号：{accountEmail} · 素材、客户与方案按账号独立保存</p>}{children}</main>
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { AiUnavailableError } from "@/lib/ai/errors";
+import { AiUnavailableError, AiResourceNotFoundError } from "@/lib/ai/errors";
 import { MaterialImageInputError } from "@/lib/files/storage";
 import { UsageLimitError } from "@/lib/usage";
 
 export function aiErrorResponse(error: unknown, fallback: string) {
+  if (error instanceof AiResourceNotFoundError) return NextResponse.json({ error: error.message }, { status: 404 });
   if (error instanceof UsageLimitError) return NextResponse.json({ error: error.message }, { status: 429 });
   // DOMException can come from a different realm and fail instanceof Error.
   if (typeof error === "object" && error !== null && "name" in error &&

@@ -10,6 +10,7 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const plan = await db.customerPlan.findFirst({ where: { id, merchantId: session.merchantId } });
   if (!plan) notFound();
+  const source = plan.sourcePlanId ? await db.customerPlan.findFirst({ where: { id: plan.sourcePlanId, merchantId: session.merchantId } }) : null;
   const customers = await db.customer.findMany({ where: { merchantId: session.merchantId }, select: { id: true, name: true }, orderBy: { name: "asc" } });
 
   const copies = [
@@ -25,6 +26,8 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ id:
         <h1 className="text-2xl font-semibold text-stone-800">{plan.customerName}的方案</h1>
         <p className="mt-2 text-sm text-stone-500">{plan.notes || "未填写备注"}</p>
       </header>
+      <Link href={`/?planId=${plan.id}`} className="inline-block rounded-xl bg-sage px-5 py-3 text-sm text-white">继续调整 / 制作新版本</Link>
+      {source && <section className="studio-card p-5"><Link href={`/plans/${source.id}`} className="text-sm text-sage underline">查看原方案</Link>{source.primaryImageUrl && <figure className="mt-4"><img src={source.primaryImageUrl} alt="原方案效果图" className="max-h-72 w-full rounded-xl object-contain" /><figcaption className="mt-2 text-sm text-stone-500">原方案效果图，供与本版本比较</figcaption></figure>}</section>}
       <PlanManager plan={{ id: plan.id, customerId: plan.customerId, customerName: plan.customerName, notes: plan.notes, status: plan.status, shortVideoScript: plan.shortVideoScript, socialCopy: plan.socialCopy, customerScript: plan.customerScript, shareToken: plan.shareToken, shareExpiresAt: plan.shareExpiresAt?.toISOString() ?? null, primaryImageUrl: plan.primaryImageUrl }} customers={customers} />
       <section className="grid gap-4 md:grid-cols-2">
         <figure className="studio-card overflow-hidden p-3">

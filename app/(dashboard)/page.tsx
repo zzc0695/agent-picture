@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ImageViewer } from "@/components/image-viewer";
+import { MaterialPicker } from "@/components/material-picker";
 
 const roomPrompt =
   "保留原房间的结构、家具、窗户位置和光线方向，仅调整窗帘。参考整体款式图的造型与配色，以及材质细节图的纹理与垂感，生成真实自然的窗帘上墙效果。";
@@ -100,6 +101,9 @@ export default function WorkbenchPage() {
   const [customerName, setCustomerName] = useState("王女士");
   const [customerId, setCustomerId] = useState("");
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [sourcePlan, setSourcePlan] = useState<{ id: string; imageUrl: string } | null>(null);
+  const [materialIds, setMaterialIds] = useState<string[]>([]);
+  const materialSlots = useRef({ style: "", detail: "" });
   const [planName, setPlanName] = useState("客厅");
   const [prompt, setPrompt] = useState(roomPrompt);
   const [originalPrompt, setOriginalPrompt] = useState(roomPrompt);
@@ -135,7 +139,23 @@ export default function WorkbenchPage() {
 
   useEffect(() => {
     let stopped = false;
-    const saved = localStorage.getItem("image-generation-job");
+    const query = new URLSearchParams(window.location.search);
+    const planId = query.get("planId");
+    if (planId && !query.get("jobId") && !localStorage.getItem("image-generation-job")) {
+      void fetch(`/api/plans/${encodeURIComponent(planId)}`).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error || "无法打开方案"); return result.plan; }).then(plan => {
+        if (stopped) return;
+        setSourcePlan({ id: plan.id, imageUrl: plan.primaryImageUrl || "" });
+        setCustomerId(plan.customerId || ""); setCustomerName(plan.customerName); setPlanName((plan.notes || "新版本").slice(0, 180));
+        setRoomImageUrl(plan.roomImageUrl); setStyleImageUrl(plan.styleImageUrl || plan.sampleImageUrl); setDetailImageUrl(plan.detailImageUrl || plan.sampleImageUrl);
+        setPrompt(plan.optimizedPrompt || plan.originalPrompt); setOriginalPrompt(plan.originalPrompt); setNegativePrompt(plan.negativePrompt); setFidelity(plan.fidelity);
+        setImageAnalysis(plan.imageAnalysis ? JSON.parse(plan.imageAnalysis) : null);
+        setMaterialIds(plan.materials?.map((item: { materialId: string }) => item.materialId) || []);
+        materialSlots.current = { style: plan.materials?.find((item: { material: { imageUrl: string } }) => item.material.imageUrl === plan.styleImageUrl)?.materialId || "", detail: plan.materials?.find((item: { material: { imageUrl: string } }) => item.material.imageUrl === plan.detailImageUrl)?.materialId || "" };
+        setActiveStep(1); setActionNotice("已载入原方案。修改要求后生成，新结果会另存为新方案。");
+      }).catch(error => { if (!stopped) setActionError(error.message); });
+      return () => { stopped = true; };
+    }
+    const saved = query.get("jobId") || localStorage.getItem("image-generation-job") || (query.has("new") ? null : localStorage.getItem("last-image-result"));
     if (saved) { void Promise.resolve().then(() => { if (!stopped) { setImageJobId(saved); setBusyAction("generate"); } }); }
     else { void fetch("/api/ai/generate-image", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(job => {
       if (!stopped && job?.jobId) { localStorage.setItem("image-generation-job", job.jobId); setImageJobId(job.jobId); setBusyAction("generate"); }
@@ -157,15 +177,22 @@ export default function WorkbenchPage() {
         if (!response.ok) { setActionNotice("查询暂时失败，将自动继续查询；无需重复生成"); timer = setTimeout(poll, 10000); return; }
         if (!restored && job.input) {
           setRoomImageUrl(job.input.roomImageUrl); setStyleImageUrl(job.input.styleImageUrl); setDetailImageUrl(job.input.detailImageUrl);
-          setPrompt(job.input.optimizedPrompt); setOriginalPrompt(job.input.optimizedPrompt);
+          setPrompt(job.input.optimizedPrompt); setOriginalPrompt(job.input.originalPrompt || job.input.optimizedPrompt);
           setNegativePrompt(job.input.negativePrompt || ""); setFidelity(job.input.fidelity);
           setImageAnalysis(job.input.imageAnalysis ? JSON.parse(job.input.imageAnalysis) : null);
+          if (job.input.customerName) setCustomerName(job.input.customerName);
+          if (job.input.planName) setPlanName(job.input.planName);
+          setCustomerId(job.input.customerId || ""); setMaterialIds(job.input.materialIds || []);
+          materialSlots.current = { style: job.input.styleMaterialId || "", detail: job.input.detailMaterialId || "" };
+          const sourceId = job.sourcePlanId === undefined ? job.input.planId : job.sourcePlanId;
+          setSourcePlan(sourceId ? { id: sourceId, imageUrl: job.input.referenceImageUrl || "" } : null);
           clearResult(); restored = true;
         }
         if (job.status === "failed") throw new Error(job.error || "生成失败，请重试");
         if (job.status === "succeeded") {
           if (!job.imageUrl) throw new Error("未收到效果图");
           clearResult(); setImageUrl(job.imageUrl); setActiveStep(2);
+          localStorage.setItem("last-image-result", imageJobId);
           localStorage.removeItem("image-generation-job"); setImageJobId(""); setBusyAction(null); return;
         }
         setActionNotice(`效果图正在生成，已等待 ${job.elapsedSeconds || 0} 秒。可以刷新页面后继续查看。`);
@@ -175,6 +202,7 @@ export default function WorkbenchPage() {
         if (error instanceof TypeError) { timer = setTimeout(poll, 10000); return; }
         setActionError(error instanceof Error ? error.message : "查询失败");
         localStorage.removeItem("image-generation-job"); setImageJobId(""); setBusyAction(null);
+        localStorage.removeItem("last-image-result");
       }
     }
     void poll();
@@ -272,11 +300,15 @@ export default function WorkbenchPage() {
 
       if (target === "room") {
         setRoomImageUrl(result.url);
+        setSourcePlan(current => current ? { ...current, imageUrl: "" } : null);
       } else if (target === "style") {
         setStyleImageUrl(result.url);
+        materialSlots.current.style = "";
       } else {
         setDetailImageUrl(result.url);
+        materialSlots.current.detail = "";
       }
+      setMaterialIds([...new Set(Object.values(materialSlots.current).filter(Boolean))]);
       setImageAnalysis(null);
       setAnalysisError("");
       setNegativePrompt("");
@@ -293,8 +325,11 @@ export default function WorkbenchPage() {
   function removeImage(target: "room" | "style" | "detail") {
     if (busyAction) return;
     if (target === "room") setRoomImageUrl("");
+    if (target === "room") setSourcePlan(current => current ? { ...current, imageUrl: "" } : null);
     if (target === "style") setStyleImageUrl("");
     if (target === "detail") setDetailImageUrl("");
+    if (target !== "room") materialSlots.current[target] = "";
+    setMaterialIds([...new Set(Object.values(materialSlots.current).filter(Boolean))]);
     setImageAnalysis(null);
     setAnalysisError("");
     setNegativePrompt("");
@@ -337,12 +372,16 @@ export default function WorkbenchPage() {
           negativePrompt,
           fidelity,
           imageAnalysis: imageAnalysis ? JSON.stringify(imageAnalysis) : "",
-          referenceImageUrl,
+          referenceImageUrl: referenceImageUrl || sourcePlan?.imageUrl || undefined,
+          planId: sourcePlan?.id,
+          customerId: customerId || null, customerName, planName, materialIds, originalPrompt,
+          styleMaterialId: materialSlots.current.style, detailMaterialId: materialSlots.current.detail,
         },
       );
       if (!result.jobId) throw new Error("未收到任务编号，请重试");
       clearResult();
       localStorage.setItem("image-generation-job", result.jobId);
+      window.history.replaceState(null, "", `/?jobId=${encodeURIComponent(result.jobId)}`);
       setImageJobId(result.jobId);
     } catch (error) {
       setActionError(
@@ -396,9 +435,10 @@ export default function WorkbenchPage() {
     setActionNotice("");
     try {
       const result = await postJson<{ plan: { id: string } }>("/api/plans", {
-        customerId: customerId || null,
+        sourcePlanId: sourcePlan?.id || null,
+        customerId: customers.some(customer => customer.id === customerId) ? customerId : null,
         customerName: customerName.trim(),
-        notes: `${planName.trim()}窗帘方案`,
+        notes: sourcePlan ? `${planName.trim()} · 新版本` : `${planName.trim()}窗帘方案`,
         roomImageUrl,
         sampleImageUrl: styleImageUrl,
         styleImageUrl,
@@ -413,7 +453,7 @@ export default function WorkbenchPage() {
         socialCopy,
         customerScript,
         status: "ready",
-        materialIds: [],
+        materialIds,
       });
       setSavedPlanId(result.plan.id);
       setActionNotice("方案已保存");
@@ -470,12 +510,14 @@ export default function WorkbenchPage() {
   return (
     <div className="studio-page flex min-h-[calc(100dvh-58px)] items-center justify-center">
       <div ref={frameRef} className="mobile-studio-frame">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs"><Link href="/records" className="text-sage underline">找回历史效果图</Link>{sourcePlan && <Link href={`/plans/${sourcePlan.id}`} className="text-sage underline">查看原方案</Link>}<button disabled={busyAction !== null} onClick={() => { window.location.href = "/?new=1"; localStorage.removeItem("last-image-result"); }} className="text-stone-500 underline">开始新方案</button></div>
         {(activeStep === 0 && (actionNotice || actionError)) || (activeStep === 1 && actionNotice && !actionError) ? <p role={actionError ? "alert" : "status"} className="p-3 text-sm text-stone-700">{actionError || actionNotice}</p> : null}
         <div className="relative h-full min-h-0 flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             {activeStep === 0 ? (
               <PageWrapper id="editor">
                 <EditorView
+                  onMaterialSelect={(id, url, role) => { if (role === "style") setStyleImageUrl(url); else setDetailImageUrl(url); materialSlots.current[role] = id; setMaterialIds([...new Set(Object.values(materialSlots.current).filter(Boolean))]); setImageAnalysis(null); clearResult(); }}
                   customers={customers}
                   customerId={customerId}
                   onCustomerSelect={(id) => { setCustomerId(id); const customer = customers.find(item => item.id === id); if (customer) setCustomerName(customer.name); clearResult(); }}
@@ -484,6 +526,7 @@ export default function WorkbenchPage() {
                   onCustomerNameChange={(value) => { setCustomerName(value); clearResult(); }}
                   onPlanNameChange={(value) => { setPlanName(value); clearResult(); }}
                   onRestoreDemo={() => {
+                    setSourcePlan(null); setMaterialIds([]); materialSlots.current = { style: "", detail: "" };
                     setRoomImageUrl(demoRoomImageUrl);
                     setStyleImageUrl(demoSampleImageUrl);
                     setDetailImageUrl(demoDetailImageUrl);
@@ -530,7 +573,7 @@ export default function WorkbenchPage() {
             {activeStep === 2 ? (
               <PageWrapper id="result">
                 <ResultView
-                  roomImageUrl={roomImageUrl}
+                  roomImageUrl={sourcePlan?.imageUrl || roomImageUrl}
                   planName={planName}
                   imageUrl={imageUrl}
                   shortVideoScript={shortVideoScript}
@@ -670,6 +713,7 @@ function StudioHeader({
 }
 
 function EditorView({
+  onMaterialSelect,
   customers,
   customerId,
   onCustomerSelect,
@@ -694,6 +738,7 @@ function EditorView({
   onRemoveDetail,
   onAnalyze,
 }: {
+  onMaterialSelect: (id: string, url: string, role: "style" | "detail") => void;
   customers: { id: string; name: string }[];
   customerId: string;
   onCustomerSelect: (id: string) => void;
@@ -736,6 +781,7 @@ function EditorView({
       />
 
       <div className="hide-scrollbar flex-1 overflow-y-auto px-4 pb-28 pt-6">
+        <MaterialPicker disabled={busyAction !== null} styleImageUrl={styleImageUrl} detailImageUrl={detailImageUrl} onSelect={onMaterialSelect} />
         <label className="mb-4 block px-2 text-xs text-stone-600">关联客户
           <select value={customerId} onChange={(event) => onCustomerSelect(event.target.value)} disabled={busyAction !== null} className="mt-2 w-full rounded-xl border border-stone-200 bg-white p-3"><option value="">仅填写称呼</option>{customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select>
           <Link href="/customers" className="mt-2 inline-block text-sage underline">管理客户</Link>

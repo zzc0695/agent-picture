@@ -4,9 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import WorkbenchPage from "@/app/(dashboard)/page";
 import { ResultPanel } from "@/components/result-panel";
 
-function mockApiResponses(options: { planError?: string; generationError?: string } = {}) {
+function mockApiResponses(options: { planError?: string; generationError?: string; existingPlan?: boolean } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url === "/api/materials") return Response.json({ materials: [{ id: "material-own", name: "我的面料", imageUrl: "/uploads/my-fabric.png" }] });
+    if (url === "/api/customers") return Response.json({ customers: [] });
+    if (url === "/api/plans/source" && options.existingPlan) return Response.json({ plan: { id: "source", customerName: "张先生", notes: "卧室", roomImageUrl: "/uploads/original.png", sampleImageUrl: "/uploads/style.png", styleImageUrl: "/uploads/style.png", detailImageUrl: "/uploads/detail.png", primaryImageUrl: "/uploads/previous.png", originalPrompt: "原方案要求", optimizedPrompt: "蓝色窗帘", negativePrompt: "变形", fidelity: "balanced", imageAnalysis: "{}", materials: [] } });
 
     if (url.endsWith("/api/files")) {
       const form = init?.body as FormData;
@@ -79,6 +82,7 @@ function mockApiResponses(options: { planError?: string; generationError?: strin
 describe("WorkbenchPage", () => {
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState({}, "", "/");
     vi.restoreAllMocks();
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
@@ -91,6 +95,46 @@ describe("WorkbenchPage", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
       () => undefined,
     );
+  });
+
+  it("finds a completed unsaved result after reloading without charging again", async () => {
+    localStorage.setItem("last-image-result", "completed-job");
+    const fetchMock = mockApiResponses(); render(<WorkbenchPage />);
+    expect(await screen.findByAltText("生成效果图")).toHaveAttribute("src", "/uploads/generated-effect.png");
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/api/ai/generate-image") && init?.method === "POST")).toBe(false);
+    expect(localStorage.getItem("last-image-result")).toBe("completed-job");
+  });
+
+  it("continues an existing plan from its result and saves a new plan without overwriting it", async () => {
+    window.history.replaceState({}, "", "/?planId=source");
+    const user = userEvent.setup(); const fetchMock = mockApiResponses({ existingPlan: true }); render(<WorkbenchPage />);
+    expect(await screen.findByDisplayValue("蓝色窗帘")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
+    await screen.findByAltText("生成效果图");
+    const generation = fetchMock.mock.calls.find(([url, init]) => String(url) === "/api/ai/generate-image" && init?.method === "POST");
+    expect(JSON.parse(String(generation?.[1]?.body))).toMatchObject({ planId: "source", referenceImageUrl: "/uploads/previous.png", roomImageUrl: "/uploads/original.png" });
+    await user.click(screen.getByRole("button", { name: "保存方案" }));
+    expect(await screen.findByText("方案展示")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url) === "/api/plans/source" && init?.method === "PATCH")).toBe(false);
+    const saved = fetchMock.mock.calls.find(([url]) => String(url) === "/api/plans");
+    expect(JSON.parse(String(saved?.[1]?.body))).toMatchObject({ sourcePlanId: "source" });
+  });
+
+  it("resumes an in-flight version after a refresh instead of loading the old plan", async () => {
+    window.history.replaceState({}, "", "/?planId=source"); localStorage.setItem("image-generation-job", "pending-version");
+    const fetchMock = mockApiResponses({ existingPlan: true }); render(<WorkbenchPage />);
+    expect(await screen.findByAltText("生成效果图")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/plans/source")).toBe(false);
+  });
+
+  it("reuses a private material image and associates it with the saved plan", async () => {
+    const user = userEvent.setup(); const fetchMock = mockApiResponses(); render(<WorkbenchPage />);
+    expect(await screen.findAllByRole("option", { name: "我的面料" })).toHaveLength(2);
+    await user.selectOptions(screen.getByLabelText("素材库面料细节"), "material-own");
+    expect(screen.getByAltText("材质细节参考")).toHaveAttribute("src", "/uploads/my-fabric.png");
+    await user.click(screen.getByRole("button", { name: "进入下一步" })); await user.click(screen.getByRole("button", { name: "生成方案效果" })); await screen.findByAltText("生成效果图"); await user.click(screen.getByRole("button", { name: "保存方案" })); await screen.findByText("方案展示");
+    const saved = fetchMock.mock.calls.find(([url]) => String(url) === "/api/plans");
+    expect(JSON.parse(String(saved?.[1]?.body))).toMatchObject({ detailImageUrl: "/uploads/my-fabric.png", materialIds: ["material-own"] });
   });
 
   it("resumes a saved image task after reloading without resubmitting", async () => {
