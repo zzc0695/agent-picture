@@ -17,7 +17,7 @@ export async function GET() {
     const start=Date.now();
     return new Promise(resolve => {
       let phase="connect";
-      const req=https.request(url,{method:"GET",family:4,autoSelectFamily:false,lookup:(_host,_options,callback)=>callback(null,item.address,4)},response=>{
+      const req=https.request(url,{method:"GET",family:4,lookup:(_host,_options,callback)=>callback(null,item.address,4)},response=>{
         response.resume();resolve({address:item.address,status:response.statusCode,phase:"response",ms:Date.now()-start});
       });
       req.on("socket",socket=>{socket.on("connect",()=>{phase="tls";});socket.on("secureConnect",()=>{phase="http";});});
