@@ -4,6 +4,9 @@ import { MaterialImageInputError } from "@/lib/files/storage";
 import { UsageLimitError } from "@/lib/usage";
 
 export function aiErrorResponse(error: unknown, fallback: string) {
+  if (error instanceof Error && (("code" in error && error.code === "Arrearage") || error.message.includes("please make sure your account is in good standing"))) {
+    return NextResponse.json({ error: "AI 服务账户暂不可用，请联系管理员检查阿里云余额及欠费状态。" }, { status: 503 });
+  }
   if (error instanceof TypeError && error.cause && typeof error.cause === "object" && "code" in error.cause &&
       ["UND_ERR_CONNECT_TIMEOUT", "ETIMEDOUT", "ECONNRESET", "ENETUNREACH"].includes(String(error.cause.code))) {
     return NextResponse.json({ error: "服务器暂时无法连接生图服务。图片与要求已保留，请稍后重试。" }, { status: 503 });
