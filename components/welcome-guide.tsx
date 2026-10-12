@@ -13,9 +13,8 @@ export function WelcomeGuide() {
     <p className="text-stone-600">工作台已放入示例图。你也可以换成客户的房间与店里的窗帘样本。</p>
     <ol className="space-y-4 leading-7">
       <li><strong>1. 准备三张图：</strong>房间全景、完整窗帘款式、面料近照。JPG、PNG 或 WebP，单张不超过 4MB。</li>
-      <li><strong>2. 写清要求：</strong>说明窗帘、颜色与层次，可以先识别图片，再润色要求。</li>
-      <li><strong>3. 查看效果：</strong>提交后显示进度，刷新页面可以继续查看；比较效果，再生成营销文案。</li>
-      <li><strong>4. 交付客户：</strong>保存到客户名下，打开方案检查内容，再创建客户分享链接。分享页提供打印或保存为 PDF。</li>
+      <li><strong>2. 写要求并生成：</strong>说明窗帘颜色与款式，在同一页面查看效果。识别、润色和还原度放在“更多选项”，按需使用。</li>
+      <li><strong>3. 保存与交付：</strong>生成后直接下载或保存，再点“复制客户链接”。客户打开链接即可查看方案，也能打印或保存 PDF。</li>
     </ol>
     <p className="text-sm text-stone-500">效果图用于搭配沟通，实际颜色、尺寸与安装效果请结合样本确认。额度可在“用量”页面查看。</p>
     {error && <p role="alert" className="text-red-600">{error}</p>}

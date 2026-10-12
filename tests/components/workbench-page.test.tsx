@@ -1,8 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import WorkbenchPage from "@/app/(dashboard)/page";
-import { ResultPanel } from "@/components/result-panel";
 
 function mockApiResponses(options: { planError?: string; generationError?: string; existingPlan?: boolean } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -51,6 +50,7 @@ function mockApiResponses(options: { planError?: string; generationError?: strin
       });
     }
 
+    if (url.endsWith("/share")) return Response.json({ path: "/share/test-token", expiresAt: "2026-10-20T00:00:00Z" });
     if (url.endsWith("/api/plans")) {
       if (options.planError) {
         return Response.json({ error: options.planError }, { status: 500 });
@@ -79,437 +79,139 @@ function mockApiResponses(options: { planError?: string; generationError?: strin
   return fetchMock;
 }
 
-describe("WorkbenchPage", () => {
+
+describe("single-page workbench", () => {
   beforeEach(() => {
-    localStorage.clear();
-    window.history.replaceState({}, "", "/");
-    vi.restoreAllMocks();
-    Object.defineProperty(URL, "createObjectURL", {
-      configurable: true,
-      value: vi.fn(() => "blob:effect-download"),
-    });
-    Object.defineProperty(URL, "revokeObjectURL", {
-      configurable: true,
-      value: vi.fn(),
-    });
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
-      () => undefined,
-    );
+    localStorage.clear(); window.history.replaceState({}, "", "/"); vi.restoreAllMocks();
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:effect-download") });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   });
 
-  it("finds a completed unsaved result after reloading without charging again", async () => {
-    localStorage.setItem("last-image-result", "completed-job");
-    const fetchMock = mockApiResponses(); render(<WorkbenchPage />);
-    expect(await screen.findByAltText("生成效果图")).toHaveAttribute("src", "/uploads/generated-effect.png");
-    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/api/ai/generate-image") && init?.method === "POST")).toBe(false);
+  it("shows uploads, requirements and the result on one page, with optional tools collapsed", async () => {
+    mockApiResponses(); render(<WorkbenchPage />);
+    expect(screen.getByLabelText("生成要求")).toBeInTheDocument();
+    for (const label of ["上传房间图片", "上传款式图片", "上传面料图片"]) expect(screen.getByLabelText(label)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成效果图" })).toBeEnabled();
+    expect(screen.getByText("效果图会显示在这里")).toBeInTheDocument();
+    expect(screen.getByText("更多选项：素材库、识别与还原度").closest("details")).not.toHaveAttribute("open");
+    expect(screen.queryByRole("button", { name: "进入下一步" })).not.toBeInTheDocument();
+  });
+
+  it("generates and saves directly, without requiring a customer name or a separate display step", async () => {
+    const user=userEvent.setup(); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图");
+    await user.click(screen.getByRole("button",{name:"保存方案"}));
+    expect(await screen.findByRole("button",{name:"复制客户链接"})).toBeEnabled();
+    const call=fetchMock.mock.calls.find(([url])=>String(url)==="/api/plans");
+    expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({customerName:"未命名客户",primaryImageUrl:"/uploads/generated-effect.png"});
+    expect(screen.getByRole("link",{name:"查看已保存方案"})).toHaveAttribute("href","/plans/plan_1");
+    expect(screen.getByLabelText("生成要求")).toBeInTheDocument();
+  });
+
+  it("copies a customer link directly after saving instead of creating duplicate plans", async () => {
+    const user=userEvent.setup(); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图");
+    await user.click(screen.getByRole("button",{name:"保存方案"})); await screen.findByRole("button",{name:"复制客户链接"});
+    await user.click(screen.getByRole("button",{name:"复制客户链接"}));
+    expect(await screen.findByLabelText("客户交付链接")).toHaveValue(window.location.origin+"/share/test-token");
+    expect(fetchMock.mock.calls.filter(([url])=>String(url)==="/api/plans")).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/plans/plan_1/share",expect.objectContaining({method:"POST"}));
+  });
+
+  it("uses the latest edited text after AI optimization instead of sending its stale result", async () => {
+    const user=userEvent.setup(); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
+    await user.click(screen.getByText("更多选项：素材库、识别与还原度"));
+    await user.click(screen.getByRole("button",{name:"AI 润色要求"})); await screen.findByDisplayValue("优化后的窗帘效果图提示词");
+    await user.clear(screen.getByLabelText("生成要求")); await user.type(screen.getByLabelText("生成要求"),"浅灰窗帘，保留书桌");
+    await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图");
+    const call=fetchMock.mock.calls.find(([url,init])=>String(url)==="/api/ai/generate-image"&&init?.method==="POST");
+    expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({optimizedPrompt:"浅灰窗帘，保留书桌",negativePrompt:"",originalPrompt:"浅灰窗帘，保留书桌"});
+  });
+
+  it("uploads all three references and analyzes them without navigating to another step", async () => {
+    const user=userEvent.setup(); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
+    for(const [label,file] of [["上传房间图片","room.png"],["上传款式图片","style.png"],["上传面料图片","detail.png"]]) {
+      await user.upload(screen.getByLabelText(label),new File(["image"],file,{type:"image/png"}));
+      await screen.findByRole("img",{name:label.replace("上传","")});
+    }
+    await user.click(screen.getByText("更多选项：素材库、识别与还原度")); await user.click(screen.getByRole("button",{name:"识别图片补充要求"}));
+    expect(await screen.findByDisplayValue("识别生成的米白双层窗帘模板文案")).toBeInTheDocument();
+    const call=fetchMock.mock.calls.find(([url])=>String(url)==="/api/ai/analyze-materials");
+    expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({roomImageUrl:"https://blob.test/room.png",styleImageUrl:"https://blob.test/style.png",detailImageUrl:"https://blob.test/detail.png"});
+    expect(screen.getByRole("button",{name:"生成效果图"})).toBeInTheDocument();
+  });
+
+  it("rejects oversized uploads before sending them to the server", async () => {
+    const user=userEvent.setup(); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
+    await user.upload(screen.getByLabelText("上传房间图片"),new File([new Uint8Array(4*1024*1024+1)],"room.png",{type:"image/png"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("4MB");
+    expect(fetchMock.mock.calls.some(([url])=>String(url)==="/api/files")).toBe(false);
+  });
+
+  it("restores a completed result after reloading without submitting or charging again", async () => {
+    localStorage.setItem("last-image-result","completed-job"); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
+    expect(await screen.findByAltText("生成效果图")).toHaveAttribute("src","/uploads/generated-effect.png");
+    expect(fetchMock.mock.calls.some(([url,init])=>String(url)==="/api/ai/generate-image"&&init?.method==="POST")).toBe(false);
     expect(localStorage.getItem("last-image-result")).toBe("completed-job");
   });
 
-  it("continues an existing plan from its result and saves a new plan without overwriting it", async () => {
-    window.history.replaceState({}, "", "/?planId=source");
-    const user = userEvent.setup(); const fetchMock = mockApiResponses({ existingPlan: true }); render(<WorkbenchPage />);
-    expect(await screen.findByDisplayValue("蓝色窗帘")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    await screen.findByAltText("生成效果图");
-    const generation = fetchMock.mock.calls.find(([url, init]) => String(url) === "/api/ai/generate-image" && init?.method === "POST");
-    expect(JSON.parse(String(generation?.[1]?.body))).toMatchObject({ planId: "source", referenceImageUrl: "/uploads/previous.png", roomImageUrl: "/uploads/original.png" });
-    await user.click(screen.getByRole("button", { name: "保存方案" }));
-    expect(await screen.findByText("方案展示")).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([url, init]) => String(url) === "/api/plans/source" && init?.method === "PATCH")).toBe(false);
-    const saved = fetchMock.mock.calls.find(([url]) => String(url) === "/api/plans");
-    expect(JSON.parse(String(saved?.[1]?.body))).toMatchObject({ sourcePlanId: "source" });
+  it("keeps pending version recovery ahead of loading the original plan", async () => {
+    window.history.replaceState({},"","/?planId=source"); localStorage.setItem("image-generation-job","pending-job");
+    const fetchMock=mockApiResponses({existingPlan:true}); render(<WorkbenchPage />); await screen.findByAltText("生成效果图");
+    expect(fetchMock.mock.calls.some(([url])=>String(url)==="/api/plans/source")).toBe(false);
   });
 
-  it("resumes an in-flight version after a refresh instead of loading the old plan", async () => {
-    window.history.replaceState({}, "", "/?planId=source"); localStorage.setItem("image-generation-job", "pending-version");
-    const fetchMock = mockApiResponses({ existingPlan: true }); render(<WorkbenchPage />);
-    expect(await screen.findByAltText("生成效果图")).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/plans/source")).toBe(false);
+  it("loads an existing plan and saves a new version without overwriting it", async () => {
+    window.history.replaceState({},"","/?planId=source"); const user=userEvent.setup(); const fetchMock=mockApiResponses({existingPlan:true}); render(<WorkbenchPage />);
+    await screen.findByDisplayValue("蓝色窗帘"); expect(screen.getByAltText("原方案效果图")).toHaveAttribute("src","/uploads/previous.png");
+    await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图");
+    const generation=fetchMock.mock.calls.find(([url,init])=>String(url)==="/api/ai/generate-image"&&init?.method==="POST");
+    expect(JSON.parse(String(generation?.[1]?.body))).toMatchObject({planId:"source",referenceImageUrl:"/uploads/previous.png",roomImageUrl:"/uploads/original.png"});
+    await user.click(screen.getByRole("button",{name:"保存方案"})); await screen.findByRole("button",{name:"复制客户链接"});
+    const saved=fetchMock.mock.calls.find(([url])=>String(url)==="/api/plans");
+    expect(JSON.parse(String(saved?.[1]?.body))).toMatchObject({sourcePlanId:"source"});
+    expect(fetchMock.mock.calls.some(([url,init])=>String(url)==="/api/plans/source"&&init?.method==="PATCH")).toBe(false);
   });
 
-  it("reuses a private material image and associates it with the saved plan", async () => {
-    const user = userEvent.setup(); const fetchMock = mockApiResponses(); render(<WorkbenchPage />);
-    expect(await screen.findAllByRole("option", { name: "我的面料" })).toHaveLength(2);
-    await user.selectOptions(screen.getByLabelText("素材库面料细节"), "material-own");
-    expect(screen.getByAltText("材质细节参考")).toHaveAttribute("src", "/uploads/my-fabric.png");
-    await user.click(screen.getByRole("button", { name: "进入下一步" })); await user.click(screen.getByRole("button", { name: "生成方案效果" })); await screen.findByAltText("生成效果图"); await user.click(screen.getByRole("button", { name: "保存方案" })); await screen.findByText("方案展示");
-    const saved = fetchMock.mock.calls.find(([url]) => String(url) === "/api/plans");
-    expect(JSON.parse(String(saved?.[1]?.body))).toMatchObject({ detailImageUrl: "/uploads/my-fabric.png", materialIds: ["material-own"] });
+  it("uses a selected account material as the reference and preserves its association", async () => {
+    const user=userEvent.setup(); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
+    await user.click(screen.getByText("更多选项：素材库、识别与还原度")); await screen.findAllByRole("option",{name:"我的面料"});
+    await user.selectOptions(screen.getByLabelText("素材库面料细节"),"material-own");
+    expect(screen.getByAltText("面料图片")).toHaveAttribute("src","/uploads/my-fabric.png");
+    await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图"); await user.click(screen.getByRole("button",{name:"保存方案"})); await screen.findByRole("button",{name:"复制客户链接"});
+    const saved=fetchMock.mock.calls.find(([url])=>String(url)==="/api/plans"); expect(JSON.parse(String(saved?.[1]?.body))).toMatchObject({detailImageUrl:"/uploads/my-fabric.png",materialIds:["material-own"]});
   });
 
-  it("resumes a saved image task after reloading without resubmitting", async () => {
-    localStorage.setItem("image-generation-job", "saved-job");
-    const fetchMock = mockApiResponses();
-    render(<WorkbenchPage />);
-    expect(await screen.findByAltText("生成效果图")).toHaveAttribute("src", "/uploads/generated-effect.png");
-    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/api/ai/generate-image") && init?.method === "POST")).toBe(false);
-    expect(localStorage.getItem("image-generation-job")).toBeNull();
+  it("makes marketing optional and saves distinct copy fields when requested", async () => {
+    const user=userEvent.setup(); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图");
+    expect(fetchMock.mock.calls.some(([url])=>String(url)==="/api/ai/generate-marketing")).toBe(false);
+    await user.click(screen.getByText("需要营销文案？")); await user.click(screen.getByRole("button",{name:"生成营销文案"})); await screen.findByText("接口返回的朋友圈文案");
+    await user.type(screen.getByLabelText("客户称呼"),"李先生"); // Changing customer intentionally clears stale customer copy.
+    await user.click(screen.getByRole("button",{name:"生成营销文案"})); await screen.findByText("接口返回的客户沟通话术");
+    await user.click(screen.getByRole("button",{name:"保存方案"})); await screen.findByRole("button",{name:"复制客户链接"});
+    const saved=fetchMock.mock.calls.find(([url])=>String(url)==="/api/plans"); expect(JSON.parse(String(saved?.[1]?.body))).toMatchObject({customerName:"李先生",shortVideoScript:"短视频脚本内容",socialCopy:"接口返回的朋友圈文案",customerScript:"接口返回的客户沟通话术"});
   });
 
-  it("renders the AI studio proposal flow from the new design reference", async () => {
-    const user = userEvent.setup();
-    mockApiResponses();
-
-    render(<WorkbenchPage />);
-
-    expect(screen.getByText("设计工作室")).toBeInTheDocument();
-    expect(screen.getByText("王女士 · 客厅")).toBeInTheDocument();
-    expect(screen.getByText("步骤 01 - 空间与材质")).toBeInTheDocument();
-    expect(screen.getByText("客户空间")).toBeInTheDocument();
-    expect(screen.getByText("材质样本")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("客户称呼"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "进入下一步" }),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    expect(screen.getByText("生成要求")).toBeInTheDocument();
-    expect(screen.getByText("步骤 02 · 核心构思")).toBeInTheDocument();
-    expect(screen.getByText("模板库")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
-    expect(screen.getByAltText("生成效果图")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "保存方案" }));
-    expect(screen.getByText("方案展示")).toBeInTheDocument();
-    expect(screen.getByText("方案已保存")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "查看客户方案" }),
-    ).toHaveAttribute("href", "/plans");
-    expect(screen.getByText("社交分享方案")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "查看已保存方案" }),
-    ).toHaveAttribute("href", "/plans/plan_1");
+  it("blocks repeat generation while submission is pending", async () => {
+    const user=userEvent.setup(); const fetchMock=mockApiResponses(); const regular=fetchMock.getMockImplementation()!; let resolve!: (response:Response)=>void;
+    fetchMock.mockImplementation(async (url,init)=>String(url)==="/api/ai/generate-image"&&init?.method==="POST" ? new Promise<Response>(done=>{resolve=done;}) : regular(url,init));
+    render(<WorkbenchPage />); await user.click(screen.getByRole("button",{name:"生成效果图"}));
+    expect(screen.getByRole("button",{name:"正在生成..."})).toBeDisabled();
+    await act(async()=>resolve(Response.json({jobId:"pending"}))); await screen.findByAltText("生成效果图");
+    expect(fetchMock.mock.calls.filter(([url,init])=>String(url)==="/api/ai/generate-image"&&init?.method==="POST")).toHaveLength(1);
   });
 
-  it("uses backend APIs for optimization, generation, marketing, and saving", async () => {
-    const user = userEvent.setup();
-    const fetchMock = mockApiResponses();
-
-    render(<WorkbenchPage />);
-
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "AI 润色" }));
-    expect(await screen.findByDisplayValue("优化后的窗帘效果图提示词")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "生成营销文案" }));
-    expect(await screen.findByText("接口返回的朋友圈文案")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "保存方案" }));
-    expect(await screen.findByText("方案展示")).toBeInTheDocument();
-    expect(screen.getByText("接口返回的客户沟通话术")).toBeInTheDocument();
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/ai/optimize-prompt",
-      expect.objectContaining({ method: "POST" }),
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/ai/generate-image",
-      expect.objectContaining({ method: "POST" }),
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/ai/generate-marketing",
-      expect.objectContaining({ method: "POST" }),
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/plans",
-      expect.objectContaining({ method: "POST" }),
-    );
+  it("shows generation failures in place and allows retry without showing a fake result", async () => {
+    const user=userEvent.setup(); mockApiResponses({generationError:"AI 任务提交失败，请重试"}); render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button",{name:"生成效果图"})); expect(await screen.findByRole("alert")).toHaveTextContent("AI 任务提交失败");
+    expect(screen.queryByAltText("生成效果图")).not.toBeInTheDocument(); expect(screen.getByRole("button",{name:"生成效果图"})).toBeEnabled();
   });
 
-  it("uploads three image roles, analyzes them, and uses them for generation", async () => {
-    const user = userEvent.setup();
-    const fetchMock = mockApiResponses();
-
-    render(<WorkbenchPage />);
-
-    await user.upload(
-      screen.getByLabelText("上传客户空间图片"),
-      new File(["room"], "room.png", { type: "image/png" }),
-    );
-    expect(await screen.findByAltText("客户空间")).toHaveAttribute(
-      "src",
-      "https://blob.test/room.png",
-    );
-
-    await user.upload(
-      screen.getByLabelText("上传整体款式图片"),
-      new File(["style"], "style.png", { type: "image/png" }),
-    );
-    expect(await screen.findByAltText("整体款式参考")).toHaveAttribute(
-      "src",
-      "https://blob.test/style.png",
-    );
-
-    await user.click(screen.getByRole("button", { name: "删除材质细节图片" }));
-    expect(
-      screen.getByRole("button", { name: "AI 识别并生成文案" }),
-    ).toBeDisabled();
-
-    await user.upload(
-      screen.getByLabelText("上传材质细节图片"),
-      new File(["detail"], "detail.png", { type: "image/png" }),
-    );
-    expect(await screen.findByAltText("材质细节参考")).toHaveAttribute(
-      "src",
-      "https://blob.test/detail.png",
-    );
-
-    await user.click(
-      screen.getByRole("button", { name: "AI 识别并生成文案" }),
-    );
-    expect(
-      await screen.findByDisplayValue("识别生成的米白双层窗帘模板文案"),
-    ).toBeInTheDocument();
-
-    const analysisCall = fetchMock.mock.calls.find(([input]) =>
-      String(input).endsWith("/api/ai/analyze-materials"),
-    );
-    expect(JSON.parse(String(analysisCall?.[1]?.body))).toEqual({
-      roomImageUrl: "https://blob.test/room.png",
-      styleImageUrl: "https://blob.test/style.png",
-      detailImageUrl: "https://blob.test/detail.png",
-    });
-
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
-
-    const generationCall = fetchMock.mock.calls.find(([input, init]) =>
-      String(input).endsWith("/api/ai/generate-image") && init?.method === "POST",
-    );
-    expect(JSON.parse(String(generationCall?.[1]?.body))).toEqual(
-      expect.objectContaining({
-        roomImageUrl: "https://blob.test/room.png",
-        styleImageUrl: "https://blob.test/style.png",
-        detailImageUrl: "https://blob.test/detail.png",
-      }),
-    );
-
-    await user.click(screen.getByRole("button", { name: "保存方案" }));
-    const saveCall = fetchMock.mock.calls.find(([input]) =>
-      String(input).endsWith("/api/plans"),
-    );
-    expect(JSON.parse(String(saveCall?.[1]?.body))).toEqual(
-      expect.objectContaining({
-        sampleImageUrl: "https://blob.test/style.png",
-        styleImageUrl: "https://blob.test/style.png",
-        detailImageUrl: "https://blob.test/detail.png",
-        imageAnalysis: expect.stringContaining("明亮的现代客厅"),
-      }),
-    );
-  });
-
-  it("opens the prompt library as a bottom sheet and can replace the prompt", async () => {
-    const user = userEvent.setup();
-    mockApiResponses();
-
-    render(<WorkbenchPage />);
-
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: /模板库/ }));
-
-    expect(screen.getByRole("dialog", { name: "提示词库" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "客厅现代简约窗帘" }),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "替换整段" }));
-
-    expect(screen.getByLabelText("生成要求")).toHaveValue(
-      "保留客厅原有结构、窗户位置和透视角度，为窗户安装现代简约风格窗帘，强调自然垂感、真实布料纹理、柔和室内光线，整体干净高级。",
-    );
-    expect(
-      screen.queryByRole("dialog", { name: "提示词库" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("switches between customer effect and detail tabs", async () => {
-    const user = userEvent.setup();
-    mockApiResponses();
-
-    render(<WorkbenchPage />);
-
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    await user.click(await screen.findByRole("button", { name: "保存方案" }));
-
-    expect(await screen.findByText("方案展示")).toBeInTheDocument();
-    expect(screen.getByText("社交分享方案")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "方案细节" }));
-
-    expect(screen.getByText("方案细节")).toBeInTheDocument();
-    expect(screen.getByText("客户：王女士")).toBeInTheDocument();
-    expect(screen.getByText("还原度：平衡")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "展示效果" }));
-
-    expect(screen.getByText("社交分享方案")).toBeInTheDocument();
-  });
-
-  it("opens the effect detail viewer and downloads the real image", async () => {
-    const user = userEvent.setup();
-    const fetchMock = mockApiResponses();
-
-    render(<WorkbenchPage />);
-
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole("button", { name: "放大查看效果图" }),
-    );
-    expect(
-      screen.getByRole("dialog", { name: "查看效果图细节" }),
-    ).toBeInTheDocument();
-    await user.click(
-      screen.getByRole("button", { name: "关闭图片查看器" }),
-    );
-
-    await user.click(screen.getByRole("button", { name: "下载高清图" }));
-    expect(await screen.findByText("高清图已开始下载")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/files/download?url=%2Fuploads%2Fgenerated-effect.png",
-    );
-    expect(URL.createObjectURL).toHaveBeenCalled();
-  });
-
-  it("shows the backend error when saving a plan fails", async () => {
-    const user = userEvent.setup();
-    mockApiResponses({ planError: "数据库暂时不可用" });
-
-    render(<WorkbenchPage />);
-
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    await user.click(await screen.findByRole("button", { name: "保存方案" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "数据库暂时不可用",
-    );
-    expect(await screen.findByText("效果呈现")).toBeInTheDocument();
-  });
-
-  it("uses the final edited prompt after optimization and saves the actual customer and input", async () => {
-    const user = userEvent.setup();
-    const fetchMock = mockApiResponses();
-    render(<WorkbenchPage />);
-    await user.clear(screen.getByLabelText("客户称呼"));
-    await user.type(screen.getByLabelText("客户称呼"), "李先生");
-    await user.clear(screen.getByLabelText("房间名称"));
-    await user.type(screen.getByLabelText("房间名称"), "卧室");
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "AI 润色" }));
-    await screen.findByDisplayValue("优化后的窗帘效果图提示词");
-    await user.clear(screen.getByLabelText("生成要求"));
-    await user.type(screen.getByLabelText("生成要求"), "蓝色窗帘，保留书桌");
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    await user.click(await screen.findByRole("button", { name: "保存方案" }));
-    const generation = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/generate-image") && init?.method === "POST");
-    expect(JSON.parse(String(generation?.[1]?.body))).toMatchObject({ optimizedPrompt: "蓝色窗帘，保留书桌", negativePrompt: "" });
-    const save = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/plans"));
-    expect(JSON.parse(String(save?.[1]?.body))).toMatchObject({ customerName: "李先生", notes: "卧室窗帘方案", originalPrompt: "蓝色窗帘，保留书桌", optimizedPrompt: "蓝色窗帘，保留书桌" });
-  });
-
-  it("includes template text inserted after optimization in the generation request", async () => {
-    const user = userEvent.setup();
-    const fetchMock = mockApiResponses();
-    render(<WorkbenchPage />);
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "AI 润色" }));
-    await screen.findByDisplayValue("优化后的窗帘效果图提示词");
-    await user.click(screen.getByRole("button", { name: /模板库/ }));
-    await user.click(screen.getByRole("button", { name: "插入到当前" }));
-    const finalText = (screen.getByLabelText("生成要求") as HTMLTextAreaElement).value;
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/generate-image") && init?.method === "POST");
-    expect(JSON.parse(String(call?.[1]?.body)).optimizedPrompt).toBe(finalText);
-    expect(finalText).toContain("现代简约风格窗帘");
-  });
-
-  it("shows image generation errors on the requirements step", async () => {
-    const user = userEvent.setup();
-    mockApiResponses({ generationError: "AI 效果图生成暂时失败，请稍后重试" });
-    render(<WorkbenchPage />);
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("AI 效果图生成暂时失败");
-    expect(screen.getByRole("button", { name: "生成方案效果" })).toBeEnabled();
-  });
-
-  it("blocks incomplete references and allows restoring the demo inputs", async () => {
-    const user = userEvent.setup();
-    mockApiResponses();
-    render(<WorkbenchPage />);
-    await user.click(screen.getByRole("button", { name: "删除材质细节图片" }));
-    expect(screen.getByRole("button", { name: "进入下一步" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "恢复示例" }));
-    expect(screen.getByRole("button", { name: "进入下一步" })).toBeEnabled();
-  });
-
-  it("compares the actual room image and clears copy when a new image is generated", async () => {
-    const user = userEvent.setup();
-    mockApiResponses();
-    render(<WorkbenchPage />);
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    await user.click(await screen.findByRole("button", { name: "对比原图" }));
-    expect(screen.getByAltText("客户空间原图")).toHaveAttribute("src", "/demo/living-room.png");
-    await user.click(screen.getByRole("button", { name: "返回效果图" }));
-    expect(screen.getByAltText("生成效果图")).toHaveAttribute("src", "/uploads/generated-effect.png");
-    await user.click(screen.getByRole("button", { name: "生成营销文案" }));
-    await screen.findByText("接口返回的朋友圈文案");
-    await user.click(screen.getByRole("button", { name: "生成更多方案" }));
-    expect(screen.queryByText("接口返回的朋友圈文案")).not.toBeInTheDocument();
-  });
-
-  it("copies the generated text and does not create a duplicate plan on repeated save", async () => {
-    const user = userEvent.setup();
-    const writeText = vi.spyOn(navigator.clipboard, "writeText");
-    const fetchMock = mockApiResponses();
-    render(<WorkbenchPage />);
-    await user.click(screen.getByRole("button", { name: "进入下一步" }));
-    await user.click(screen.getByRole("button", { name: "生成方案效果" }));
-    await user.click(await screen.findByRole("button", { name: "生成营销文案" }));
-    await user.click(screen.getByRole("button", { name: "保存方案" }));
-    await user.click(await screen.findByRole("button", { name: "复制社交分享方案" }));
-    expect(writeText).toHaveBeenCalledWith("接口返回的朋友圈文案");
-    await user.click(screen.getByRole("button", { name: "返回" }));
-    await user.click(screen.getByRole("button", { name: "保存方案" }));
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/api/plans"))).toHaveLength(1);
-  });
-});
-
-describe("ResultPanel", () => {
-  it("shows the generated effect image as a visual result", () => {
-    render(
-      <ResultPanel
-        imageUrl="/uploads/effect.png"
-        shortVideoScript=""
-        socialCopy=""
-        customerScript=""
-        onSimilar={() => undefined}
-        onMarketing={() => undefined}
-        onSave={() => undefined}
-      />,
-    );
-
-    expect(screen.getByAltText("生成效果图")).toHaveAttribute(
-      "src",
-      "/uploads/effect.png",
-    );
-    expect(
-      screen.getByRole("button", { name: "保存高清图" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "生成前后对比图" }),
-    ).toBeInTheDocument();
+  it("keeps the generated image available when saving fails", async () => {
+    const user=userEvent.setup(); mockApiResponses({planError:"保存失败，请重试"}); render(<WorkbenchPage />);
+    await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图"); await user.click(screen.getByRole("button",{name:"保存方案"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("保存失败"); expect(screen.getByAltText("生成效果图")).toBeInTheDocument(); expect(screen.getByRole("button",{name:"保存方案"})).toBeEnabled();
   });
 });
