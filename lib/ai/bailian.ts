@@ -113,7 +113,7 @@ export async function submitBailianImage(apiKey: string, model: string, content:
 export async function getBailianImageTask(apiKey: string, taskId: string) {
   const response = await fetch(`${imageApiBase()}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
     ...imageTransport,
-    headers: { Authorization: "Bearer " + apiKey }, signal: AbortSignal.timeout(15_000), cache: "no-store",
+    headers: { Authorization: "Bearer " + apiKey }, signal: AbortSignal.timeout(45_000), cache: "no-store",
   });
   const body = await response.json();
   if (!response.ok) throw new Error(providerErrorMessage(body, response.status));

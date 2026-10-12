@@ -13,6 +13,7 @@ export function aiErrorResponse(error: unknown, fallback: string) {
   // DOMException can come from a different realm and fail instanceof Error.
   if (typeof error === "object" && error !== null && "name" in error &&
       (error.name === "TimeoutError" || error.name === "AbortError")) {
+    console.error(JSON.stringify({ event: "ai_request_timeout", errorType: error.name }));
     return NextResponse.json({ error: "AI 生成等待超时，请稍后重试" }, { status: 504 });
   }
   if (error instanceof AiUnavailableError) {
