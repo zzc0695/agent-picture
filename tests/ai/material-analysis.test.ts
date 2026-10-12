@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const completionCreate = vi.hoisted(() => vi.fn());
-const toBailianImageReference = vi.hoisted(() => vi.fn());
+const toAsyncImageReference = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ai/bailian", () => ({
   getBailianConfig: () => ({
@@ -20,7 +20,7 @@ vi.mock("@/lib/ai/bailian", () => ({
 }));
 
 vi.mock("@/lib/files/storage", () => ({
-  toBailianImageReference,
+  toAsyncImageReference,
 }));
 
 describe("material image analysis", () => {
@@ -28,7 +28,7 @@ describe("material image analysis", () => {
     vi.resetModules();
     vi.clearAllMocks();
     delete process.env.DASHSCOPE_API_KEY;
-    toBailianImageReference.mockImplementation(async (url: string) =>
+    toAsyncImageReference.mockImplementation(async (url: string) =>
       `data:image/jpeg;base64,${url}`,
     );
   });

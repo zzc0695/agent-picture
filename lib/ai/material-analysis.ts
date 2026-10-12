@@ -5,7 +5,7 @@ import {
   extractChatCompletionText,
   getBailianConfig,
 } from "@/lib/ai/bailian";
-import { toBailianImageReference } from "@/lib/files/storage";
+import { toAsyncImageReference } from "@/lib/files/storage";
 import {
   materialAnalysisRequestSchema,
   materialAnalysisResultSchema,
@@ -45,9 +45,9 @@ export async function analyzeMaterials(input: MaterialAnalysisInput) {
   }
 
   const imageUrls = await Promise.all([
-    toBailianImageReference(parsedInput.roomImageUrl),
-    toBailianImageReference(parsedInput.styleImageUrl),
-    toBailianImageReference(parsedInput.detailImageUrl),
+    toAsyncImageReference(parsedInput.roomImageUrl),
+    toAsyncImageReference(parsedInput.styleImageUrl),
+    toAsyncImageReference(parsedInput.detailImageUrl),
   ]);
   const content: OpenAI.ChatCompletionContentPart[] = [
     ...imageUrls.map((url) => ({
