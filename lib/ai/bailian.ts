@@ -1,3 +1,8 @@
+import { Agent } from "undici";
+
+const imageDispatcher = new Agent({ connect: { timeout: 30_000, family: 4 } });
+const imageTransport = { dispatcher: imageDispatcher };
+
 import OpenAI from "openai";
 
 const textBaseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
@@ -92,6 +97,7 @@ function imageApiBase() {
 
 export async function submitBailianImage(apiKey: string, model: string, content: BailianContentPart[], options: BailianImageOptions = {}) {
   const response = await fetch(`${imageApiBase()}/api/v1/services/aigc/image-generation/generation`, {
+    ...imageTransport,
     method: "POST", signal: AbortSignal.timeout(45_000),
     headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json", "X-DashScope-Async": "enable" },
     body: JSON.stringify({ model, input: { messages: [{ role: "user", content }] }, parameters: {
@@ -106,6 +112,7 @@ export async function submitBailianImage(apiKey: string, model: string, content:
 
 export async function getBailianImageTask(apiKey: string, taskId: string) {
   const response = await fetch(`${imageApiBase()}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
+    ...imageTransport,
     headers: { Authorization: "Bearer " + apiKey }, signal: AbortSignal.timeout(15_000), cache: "no-store",
   });
   const body = await response.json();

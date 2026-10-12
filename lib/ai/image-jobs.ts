@@ -33,7 +33,8 @@ export async function startImageJob(merchantId: string, body: unknown) {
     await db.generationRecord.update({ where: { id: job.id }, data: { status: "failed",
       failureReason: "参考图读取或任务提交失败，请检查图片后重试", timings: { stage, referenceMs, totalMs: Date.now() - started } } });
     console.error(JSON.stringify({ event: "image_job_failed", jobId: job.id, stage, elapsedMs: Date.now() - started,
-      errorType: error instanceof Error ? error.name : "unknown" }));
+      errorType: error instanceof Error ? error.name : "unknown",
+      errorCode: error instanceof Error && error.cause && typeof error.cause === "object" && "code" in error.cause ? error.cause.code : undefined }));
     throw error;
   }
 }

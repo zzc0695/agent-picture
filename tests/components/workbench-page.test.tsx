@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import WorkbenchPage from "@/app/(dashboard)/page";
+import WorkbenchPage from "@/components/workbench-page";
 
 function mockApiResponses(options: { planError?: string; generationError?: string; existingPlan?: boolean } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -214,4 +214,21 @@ describe("single-page workbench", () => {
     await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图"); await user.click(screen.getByRole("button",{name:"保存方案"}));
     expect(await screen.findByRole("alert")).toHaveTextContent("保存失败"); expect(screen.getByAltText("生成效果图")).toBeInTheDocument(); expect(screen.getByRole("button",{name:"保存方案"})).toBeEnabled();
   });
+  it("previews immediately and uploads three slots concurrently while generation waits", async () => {
+    const user=userEvent.setup();const mock=mockApiResponses();const regular=mock.getMockImplementation()!;const pending: ((response: Response) => void)[]=[];
+    mock.mockImplementation((url,init)=>String(url)==='/api/files'?new Promise(resolve=>pending.push(resolve)):regular(url,init));
+    render(<WorkbenchPage />);
+    await user.upload(screen.getByLabelText('上传房间图片'),new File(['image'],'room.png',{type:'image/png'}));
+    expect(screen.getByAltText('房间图片')).toHaveAttribute('src','blob:effect-download');
+    expect(screen.getByLabelText('上传款式图片')).toBeEnabled();
+    await user.upload(screen.getByLabelText('上传款式图片'),new File(['image'],'style.png',{type:'image/png'}));
+    await user.upload(screen.getByLabelText('上传面料图片'),new File(['image'],'detail.png',{type:'image/png'}));
+    expect(pending).toHaveLength(3);expect(screen.getByRole('button',{name:'生成效果图'})).toBeDisabled();
+    await act(async()=>{pending.forEach((resolve,index)=>resolve(Response.json({url:'/uploads/'+index+'.png'})));});
+    expect(screen.getByRole('button',{name:'生成效果图'})).toBeEnabled();
+    await user.click(screen.getByRole('button',{name:'生成效果图'}));await screen.findByAltText('生成效果图');
+    const call=mock.mock.calls.find(([url,init])=>String(url)==='/api/ai/generate-image'&&init?.method==='POST');
+    expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({roomImageUrl:'/uploads/0.png',styleImageUrl:'/uploads/1.png',detailImageUrl:'/uploads/2.png'});
+  });
+
 });

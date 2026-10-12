@@ -1,5 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { requirePageMerchantSession } from "@/lib/auth/require-session";
+import { Suspense } from "react";
+import { PersistentWorkbench } from "@/components/persistent-workbench";
 
 export default async function DashboardLayout({
   children,
@@ -8,5 +10,5 @@ export default async function DashboardLayout({
 }) {
   const session = await requirePageMerchantSession();
 
-  return <AppShell accountEmail={session.email}>{children}</AppShell>;
+  return <AppShell accountEmail={session.email}><Suspense fallback={null}><PersistentWorkbench key={session.merchantId} /></Suspense>{children}</AppShell>;
 }

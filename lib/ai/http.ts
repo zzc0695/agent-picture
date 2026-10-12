@@ -4,6 +4,10 @@ import { MaterialImageInputError } from "@/lib/files/storage";
 import { UsageLimitError } from "@/lib/usage";
 
 export function aiErrorResponse(error: unknown, fallback: string) {
+  if (error instanceof TypeError && error.cause && typeof error.cause === "object" && "code" in error.cause &&
+      ["UND_ERR_CONNECT_TIMEOUT", "ETIMEDOUT", "ECONNRESET", "ENETUNREACH"].includes(String(error.cause.code))) {
+    return NextResponse.json({ error: "服务器暂时无法连接生图服务。图片与要求已保留，请稍后重试。" }, { status: 503 });
+  }
   if (error instanceof AiResourceNotFoundError) return NextResponse.json({ error: error.message }, { status: 404 });
   if (error instanceof UsageLimitError) return NextResponse.json({ error: error.message }, { status: 429 });
   // DOMException can come from a different realm and fail instanceof Error.
