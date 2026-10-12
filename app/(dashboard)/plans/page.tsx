@@ -41,7 +41,6 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
 }
 
 function PageHeader({
-  eyebrow,
   title,
   description,
 }: {
@@ -50,10 +49,8 @@ function PageHeader({
   description: string;
 }) {
   return (
-    <header className="mb-8 px-1">
-      <p className="text-[11px] font-medium tracking-widest text-sage">
-        {eyebrow}
-      </p>
+    <header className="library-header">
+      
       <h1 className="mt-2 font-serif text-[30px] font-medium text-stone-800">
         {title}
       </h1>

@@ -145,6 +145,34 @@ button:disabled {
   transform: translateY(-1px);
 }
 
+.studio-nav-link[aria-current="page"] {
+  border-color: var(--sage);
+  background: var(--sage);
+  color: white;
+  box-shadow: 0 5px 14px -9px rgba(53, 106, 100, 0.5);
+}
+
+.library-header { margin-bottom: 28px; }
+.library-header h1 { margin: 0; font-family: var(--font-sans); font-size: 28px; font-weight: 600; color: #172831; }
+.library-header p { margin-top: 10px; font-size: 14px; line-height: 1.8; color: #536573; }
+.library-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 24px; }
+.library-toolbar > select { width: auto; max-width: 100%; }
+.library-search { display: flex; flex: 1 1 240px; align-items: center; gap: 10px; min-height: 46px; border: 1px solid var(--border); border-radius: 12px; background: white; padding: 0 14px; color: #536573; }
+.library-search:focus-within { border-color: var(--sage); box-shadow: 0 0 0 4px rgba(53, 106, 100, 0.08); }
+.library-search input { min-width: 0; width: 100%; padding: 12px 0; background: transparent; font-size: 14px; outline: none; }
+.prompt-card { display: flex; flex-direction: column; }
+.prompt-card > button { align-self: flex-start; }
+.prompt-card > p { flex-grow: 1; }
+.studio-library-page { animation: studio-enter 260ms ease-out both; }
+a.studio-card, .prompt-card { transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  a.studio-card:hover, .prompt-card:hover { border-color: #91b1ab; transform: translateY(-2px); box-shadow: 0 16px 32px -22px rgba(35, 52, 62, 0.32); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-library-page { animation: none; }
+  a.studio-card:hover, .prompt-card:hover, .studio-nav-link:hover { transform: none; }
+}
+
 .studio-page {
   width: min(100%, 1040px);
   margin: 0 auto;
