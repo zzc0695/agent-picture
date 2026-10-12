@@ -1,3 +1,4 @@
+import { curtainTemplates } from "@/lib/prompt-templates";
 import { NextResponse } from "next/server";
 import {
   requireMerchantSession,
@@ -14,7 +15,7 @@ export async function GET() {
     orderBy: [{ isSystem: "desc" }, { createdAt: "desc" }],
   });
 
-  return NextResponse.json({ templates });
+  return NextResponse.json({ templates: [...curtainTemplates, ...templates] });
 }
 
 export async function POST(request: Request) {

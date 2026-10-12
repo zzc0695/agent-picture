@@ -187,7 +187,7 @@ describe("single-page workbench", () => {
     const user=userEvent.setup(); const fetchMock=mockApiResponses(); render(<WorkbenchPage />);
     await user.click(screen.getByRole("button",{name:"生成效果图"})); await screen.findByAltText("生成效果图");
     expect(fetchMock.mock.calls.some(([url])=>String(url)==="/api/ai/generate-marketing")).toBe(false);
-    await user.click(screen.getByText("需要营销文案？")); await user.click(screen.getByRole("button",{name:"生成营销文案"})); await screen.findByText("接口返回的朋友圈文案");
+    await user.click(screen.getByRole("button",{name:"生成营销文案"})); await screen.findByText("接口返回的朋友圈文案");
     await user.type(screen.getByLabelText("客户称呼"),"李先生"); // Changing customer intentionally clears stale customer copy.
     await user.click(screen.getByRole("button",{name:"生成营销文案"})); await screen.findByText("接口返回的客户沟通话术");
     await user.click(screen.getByRole("button",{name:"保存方案"})); await screen.findByRole("button",{name:"复制客户链接"});

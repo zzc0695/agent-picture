@@ -141,4 +141,13 @@ describe("generateEffectImage", () => {
       { negativePrompt: "" },
     );
   });
+  it("adds position protection even when the user supplies a short prompt", async () => {
+    process.env.DASHSCOPE_API_KEY='test-key';
+    const { prepareImageGeneration }=await import('@/lib/ai/image');
+    const result=await prepareImageGeneration({roomImageUrl:'/room.png',styleImageUrl:'/style.png',detailImageUrl:'/detail.png',optimizedPrompt:'换成蓝色',negativePrompt:'',fidelity:'balanced',imageAnalysis:''});
+    const text=result.content.find(part=>'text' in part)?.text;
+    expect(text).toContain('不移动床、沙发、桌椅');
+    expect(text).toContain('只调整原窗户对应的窗帘区域');
+  });
+
 });

@@ -1,3 +1,4 @@
+import { geometryProtection } from "@/lib/prompt-templates";
 import {
   generateBailianImage,
   getBailianConfig,
@@ -36,6 +37,7 @@ export async function prepareImageGeneration(input: {
     "样本还原度：" + input.fidelity,
     input.imageAnalysis ? "图片识别摘要：" + input.imageAnalysis : "",
     "必须保留原房间结构、窗户位置、透视角度和主要光线方向。",
+    geometryProtection,
   ]
     .filter(Boolean)
     .join("\n");
