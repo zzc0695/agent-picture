@@ -31,5 +31,14 @@ export async function GET() {
   async function probe(dispatcher?: Agent){const start=Date.now();try{const r=await fetch(url,{...(dispatcher?{dispatcher}:{}),signal:AbortSignal.timeout(20000),cache:"no-store"});await r.body?.cancel();return {status:r.status,ms:Date.now()-start};}catch(e){return {ms:Date.now()-start,code:e instanceof Error&&e.cause&&typeof e.cause==='object'&&'code'in e.cause?e.cause.code:undefined,error:e instanceof Error?e.name:"unknown"};}}
   const [native,custom,ipProbes]=await Promise.all([probe(),probe(agent),Promise.all(probes)]);
   await agent.close();
-  return NextResponse.json({region:process.env.VERCEL_REGION,host:url.hostname,addresses,native,custom,ipProbes});
+  const payload=JSON.stringify({model:"connectivity-probe-invalid-model",input:{messages:[]}});
+  const headers={Authorization:"Bearer "+process.env.DASHSCOPE_API_KEY,"Content-Type":"application/json","X-DashScope-Async":"enable"};
+  async function authenticatedProbe(useCustom:boolean){
+    const started=Date.now();const dispatcher=useCustom?new Agent({connect:{timeout:18000},autoSelectFamily:true}):undefined;
+    try {const response=await fetch(url,{method:"POST",headers,body:payload,...(dispatcher?{dispatcher}:{}),signal:AbortSignal.timeout(20000)});const body=await response.json();return {status:response.status,code:body.code,ms:Date.now()-started};}
+    catch(error){const e=error as Error&{cause?:{code?:string;syscall?:string;address?:string;errors?:{code?:string;address?:string}[]}};return {ms:Date.now()-started,name:e.name,cause:e.cause?{code:e.cause.code,syscall:e.cause.syscall,address:e.cause.address,errors:e.cause.errors?.map(x=>({code:x.code,address:x.address}))}:undefined};}
+    finally{if(dispatcher)await dispatcher.close();}
+  }
+  const [authenticatedNative,authenticatedCustom]=await Promise.all([authenticatedProbe(false),authenticatedProbe(true)]);
+  return NextResponse.json({region:process.env.VERCEL_REGION,host:url.hostname,addresses,native,custom,ipProbes,authenticatedNative,authenticatedCustom});
 }
