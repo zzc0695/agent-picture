@@ -18,7 +18,7 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
         title="客户方案"
         description="查看已保存的客户方案，点击卡片打开效果图、生成要求和营销文案。"
       />
-      <form className="mb-6 flex flex-wrap gap-3" action="/plans">
+      <form className="plan-filters mb-6 flex flex-wrap gap-3" action="/plans">
         <input aria-label="搜索方案" name="q" defaultValue={filters.q} placeholder="搜索客户、房间或备注" className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm" />
         <select aria-label="筛选客户" name="customerId" defaultValue={filters.customerId ?? ""} className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm"><option value="">所有客户</option>{customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select>
         <select aria-label="筛选状态" name="status" defaultValue={filters.status ?? ""} className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm"><option value="">所有状态</option><option value="draft">草稿</option><option value="ready">已生成</option><option value="delivered">已交付</option></select>
