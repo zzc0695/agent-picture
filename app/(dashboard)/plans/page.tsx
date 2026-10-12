@@ -50,7 +50,7 @@ function PageHeader({
 }) {
   return (
     <header className="library-header">
-      
+
       <h1 className="mt-2 font-serif text-[30px] font-medium text-stone-800">
         {title}
       </h1>
