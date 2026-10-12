@@ -1,6 +1,6 @@
 import { Agent } from "undici";
 
-const imageDispatcher = new Agent({ connect: { timeout: 30_000, family: 4 } });
+const imageDispatcher = new Agent({ connect: { timeout: 30_000 }, autoSelectFamily: true, autoSelectFamilyAttemptTimeout: 300 });
 const imageTransport = { dispatcher: imageDispatcher };
 
 import OpenAI from "openai";
