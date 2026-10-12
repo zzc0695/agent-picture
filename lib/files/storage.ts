@@ -2,6 +2,22 @@ import crypto from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { put } from "@vercel/blob";
+import sharp from "sharp";
+
+export async function roomImageOutputSize(imageUrl: string) {
+  const reference = await toBailianImageReference(imageUrl);
+  if (!reference.startsWith("data:image/")) return undefined;
+  const bytes = Buffer.from(reference.slice(reference.indexOf(",") + 1), "base64");
+  const metadata = await sharp(bytes).metadata();
+  let width = metadata.width;
+  let height = metadata.height;
+  if (!width || !height) throw new MaterialImageInputError("无法读取房间图片尺寸，请更换图片");
+  if ([5, 6, 7, 8].includes(metadata.orientation ?? 1)) [width, height] = [height, width];
+  const ratio = Math.max(1 / 8, Math.min(8, width / height));
+  const outputWidth = Math.round(Math.sqrt(1024 * 1024 * ratio) / 16) * 16;
+  const outputHeight = Math.round(Math.sqrt(1024 * 1024 / ratio) / 16) * 16;
+  return `${outputWidth}*${outputHeight}`;
+}
 
 export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const BAILIAN_IMAGE_TYPES = new Set([

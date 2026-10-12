@@ -1,7 +1,7 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 
+import { PreviewImage } from "@/components/preview-image";
 import { useState } from "react";
 
 export function FilePicker({
@@ -38,7 +38,7 @@ export function FilePicker({
       </span>
       <span className="mx-4 block overflow-hidden rounded-lg border bg-neutral-100">
         {value ? (
-          <img
+          <PreviewImage
             alt={label}
             src={value}
             className="aspect-[16/10] w-full object-cover"

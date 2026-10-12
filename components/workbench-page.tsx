@@ -1,7 +1,7 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 
+import { PreviewImage } from "@/components/preview-image";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Download, Image as ImageIcon, RefreshCw, Sparkles, UploadCloud } from "lucide-react";
@@ -487,10 +487,10 @@ export default function WorkbenchPage() {
       <section ref={resultRef} className="studio-card space-y-5 p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold text-stone-900">{imageUrl ? "效果图" : sourcePlan?.imageUrl ? "原方案效果图" : "生成结果"}</h2><Link href="/records" className="text-xs text-sage underline">找回历史结果</Link></div>
         {busyAction === "generate" && <div className="space-y-3"><p role="status" className="flex items-center gap-2 text-sm leading-6 text-sage"><RefreshCw size={16} className="workbench-spin" aria-hidden="true" />{actionNotice || "图片正在生成，可以关闭页面后从记录中找回。"}</p><div className="workbench-progress" aria-hidden="true" /></div>}
-        {previewUrl ? <a href={previewUrl} target="_blank" rel="noreferrer" aria-label="打开完整效果图"><img key={previewUrl} src={previewUrl} alt={imageUrl ? "生成效果图" : "原方案效果图"} className="workbench-preview" /></a> : <div className="workbench-empty"><ImageIcon size={34} strokeWidth={1.4} /><p className="mt-4 text-sm">效果图会显示在这里</p><p className="mt-2 text-xs">生成后可以下载、保存和交付客户。</p></div>}
+        {previewUrl ? <a href={previewUrl} target="_blank" rel="noreferrer" aria-label="打开完整效果图"><PreviewImage key={previewUrl} loading="eager" src={previewUrl} alt={imageUrl ? "生成效果图" : "原方案效果图"} className="workbench-preview" /></a> : <div className="workbench-empty"><ImageIcon size={34} strokeWidth={1.4} /><p className="mt-4 text-sm">效果图会显示在这里</p><p className="mt-2 text-xs">生成后可以下载、保存和交付客户。</p></div>}
         {!imageUrl && <section className="workbench-options" aria-label="宣传文案"><h3 className="text-base font-semibold text-stone-900">宣传文案</h3><p className="mt-2 text-sm leading-6 text-stone-500">先生成效果图，再制作短视频脚本、朋友圈文案和客户方案说明。</p><button disabled className="studio-secondary-button mt-4 px-4">生成营销文案</button></section>}
         {imageUrl && <>
-          <div className="flex flex-wrap items-center gap-4"><button disabled={downloading} onClick={() => void downloadImage()} className="inline-flex items-center gap-2 text-sm text-sage"><Download size={16} />{downloading ? "下载中..." : "下载图片"}</button><details className="text-sm"><summary className="cursor-pointer text-stone-600">查看原图对比</summary><img src={sourcePlan?.imageUrl || roomImageUrl} alt="客户空间原图" className="mt-3 max-h-64 w-full rounded-xl object-contain" /></details></div>
+          <div className="flex flex-wrap items-center gap-4"><button disabled={downloading} onClick={() => void downloadImage()} className="inline-flex items-center gap-2 text-sm text-sage"><Download size={16} />{downloading ? "下载中..." : "下载图片"}</button><details className="text-sm"><summary className="cursor-pointer text-stone-600">查看原图对比</summary><PreviewImage src={roomImageUrl} alt="客户空间原图" className="mt-3 max-h-64 w-full rounded-xl object-contain" /></details></div>
           <p className="text-xs leading-6 text-stone-500">效果图用于搭配沟通，实际颜色、尺寸与安装效果请结合样本确认。</p>
           <div className="space-y-4 border-t border-stone-200 pt-5">
             {customers.length > 0 && <label className="block text-sm text-stone-700">关联已有客户（选填）<select className="workbench-input mt-2" value={customerId} disabled={busy} onChange={event => { setCustomerId(event.target.value); updateCustomer(customers.find(customer => customer.id === event.target.value)?.name || ""); }}><option value="">暂不关联</option>{customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>}
@@ -511,5 +511,5 @@ function scrollToResult(element: HTMLElement | null) {
 }
 
 function UploadSlot({ title, url, busy, uploading, onUpload }: { title: string; url: string; busy: boolean; uploading: boolean; onUpload: (file: File) => void }) {
-  return <label className={`workbench-upload ${busy ? "opacity-60" : "cursor-pointer"}`}><span className="text-xs font-medium text-stone-700">{title}</span><div className="mt-2 aspect-square overflow-hidden rounded-xl border border-stone-200 bg-stone-50">{url ? <img src={url} alt={title} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-stone-400"><UploadCloud size={24} /></div>}</div><span className="mt-2 block text-center text-xs text-sage">{uploading ? "上传中..." : url ? "点击更换" : "选择图片"}</span><input aria-label={`上传${title}`} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} className="sr-only" onChange={event => { const file = event.target.files?.[0]; if (file) onUpload(file); event.target.value=""; }} /></label>;
+  return <label className={`workbench-upload ${busy ? "opacity-60" : "cursor-pointer"}`}><span className="text-xs font-medium text-stone-700">{title}</span><div className="mt-2 aspect-square overflow-hidden rounded-xl border border-stone-200 bg-stone-50">{url ? <PreviewImage sizes="(max-width: 640px) 30vw, 180px" src={url} alt={title} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-stone-400"><UploadCloud size={24} /></div>}</div><span className="mt-2 block text-center text-xs text-sage">{uploading ? "上传中..." : url ? "点击更换" : "选择图片"}</span><input aria-label={`上传${title}`} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} className="sr-only" onChange={event => { const file = event.target.files?.[0]; if (file) onUpload(file); event.target.value=""; }} /></label>;
 }

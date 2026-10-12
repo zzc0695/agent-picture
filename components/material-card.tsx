@@ -1,4 +1,5 @@
-/* eslint-disable @next/next/no-img-element */
+
+import { PreviewImage } from "@/components/preview-image";
 
 export function MaterialCard({
   material,
@@ -22,8 +23,8 @@ export function MaterialCard({
     <article className="studio-card overflow-hidden p-2">
       <div className="relative aspect-[4/3] overflow-hidden rounded-[18px] bg-stone-100">
         {hasRenderableImage ? (
-          <img
-            src={material.imageUrl}
+          <PreviewImage
+            sizes="(max-width: 640px) 50vw, 320px" src={material.imageUrl}
             alt={material.name}
             className="h-full w-full object-cover"
           />

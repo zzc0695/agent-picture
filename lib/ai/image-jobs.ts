@@ -23,10 +23,10 @@ export async function startImageJob(merchantId: string, body: unknown) {
   let stage = "references";
   let referenceMs = 0;
   try {
-    const { config, content } = await prepareImageGeneration(input, true);
+    const { config, content, negativePrompt, size } = await prepareImageGeneration(input, true);
     referenceMs = Date.now() - started;
     stage = "submission";
-    const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt: input.negativePrompt });
+    const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt, size });
     return view(await db.generationRecord.update({ where: { id: job.id }, data: {
       status: "running", providerTaskId, timings: { referenceMs, submissionMs: Date.now() - started - referenceMs } } }));
   } catch (error) {
@@ -61,8 +61,8 @@ export async function pollImageJob(merchantId: string, id: string) {
     if (!claimed.count) return view(job);
     try {
       const input = imageGenerationRequestSchema.parse(job.inputData);
-      const { config, content } = await prepareImageGeneration(input, true);
-      const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt: input.negativePrompt });
+      const { config, content, negativePrompt, size } = await prepareImageGeneration(input, true);
+      const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt, size });
       return view(await db.generationRecord.update({ where: { id }, data: { status: "running", providerTaskId, leaseUntil: null,
         failureReason: null, timings: { ...timings, stage: "model", attempts } } }));
     } catch (error) {

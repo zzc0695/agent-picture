@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+import { PreviewImage } from "@/components/preview-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -27,16 +27,16 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ id:
         <p className="mt-2 text-sm text-stone-500">{plan.notes || "未填写备注"}</p>
       </header>
       <Link href={`/?planId=${plan.id}`} className="inline-block rounded-xl bg-sage px-5 py-3 text-sm text-white">继续调整 / 制作新版本</Link>
-      {source && <section className="studio-card p-5"><Link href={`/plans/${source.id}`} className="text-sm text-sage underline">查看原方案</Link>{source.primaryImageUrl && <figure className="mt-4"><img src={source.primaryImageUrl} alt="原方案效果图" className="max-h-72 w-full rounded-xl object-contain" /><figcaption className="mt-2 text-sm text-stone-500">原方案效果图，供与本版本比较</figcaption></figure>}</section>}
+      {source && <section className="studio-card p-5"><Link href={`/plans/${source.id}`} className="text-sm text-sage underline">查看原方案</Link>{source.primaryImageUrl && <figure className="mt-4"><PreviewImage src={source.primaryImageUrl} alt="原方案效果图" className="max-h-72 w-full rounded-xl object-contain" /><figcaption className="mt-2 text-sm text-stone-500">原方案效果图，供与本版本比较</figcaption></figure>}</section>}
       <PlanManager plan={{ id: plan.id, customerId: plan.customerId, customerName: plan.customerName, notes: plan.notes, status: plan.status, shortVideoScript: plan.shortVideoScript, socialCopy: plan.socialCopy, customerScript: plan.customerScript, shareToken: plan.shareToken, shareExpiresAt: plan.shareExpiresAt?.toISOString() ?? null, primaryImageUrl: plan.primaryImageUrl }} customers={customers} />
       <section className="grid gap-4 md:grid-cols-2">
         <figure className="studio-card overflow-hidden p-3">
-          <img src={plan.roomImageUrl} alt="客户空间原图" className="aspect-square w-full rounded-xl object-contain" />
+          <PreviewImage src={plan.roomImageUrl} alt="客户空间原图" className="aspect-square w-full rounded-xl object-contain" />
           <figcaption className="p-3 text-sm">客户空间原图</figcaption>
         </figure>
         {plan.primaryImageUrl ? <figure className="studio-card overflow-hidden p-3">
           <a href={plan.primaryImageUrl} target="_blank" rel="noreferrer" aria-label="打开完整效果图">
-            <img src={plan.primaryImageUrl} alt="已保存的效果图" className="aspect-square w-full rounded-xl object-contain" />
+            <PreviewImage src={plan.primaryImageUrl} alt="已保存的效果图" className="aspect-square w-full rounded-xl object-contain" />
           </a>
           <figcaption className="flex items-center justify-between gap-3 p-3 text-sm">
             <span>已保存的效果图</span>

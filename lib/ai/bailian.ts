@@ -17,6 +17,7 @@ export type BailianContentPart =
 
 export type BailianImageOptions = {
   negativePrompt?: string;
+  size?: string;
 };
 
 type BailianImageResponse = {
@@ -101,7 +102,7 @@ export async function submitBailianImage(apiKey: string, model: string, content:
     method: "POST", signal: AbortSignal.timeout(45_000),
     headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json", "X-DashScope-Async": "enable" },
     body: JSON.stringify({ model, input: { messages: [{ role: "user", content }] }, parameters: {
-      size: "1024*1024", n: 1, negative_prompt: options.negativePrompt || undefined, prompt_extend: false, watermark: false,
+      size: options.size ?? "1024*1024", n: 1, negative_prompt: options.negativePrompt || undefined, prompt_extend: false, watermark: false,
     } }),
   });
   const body = await response.json();
@@ -141,7 +142,7 @@ export async function generateBailianImage(
         messages: [{ role: "user", content }],
       },
       parameters: {
-        size: "1024*1024",
+        size: options.size ?? "1024*1024",
         n: 1,
         negative_prompt: options.negativePrompt || undefined,
         // The workbench already supplies detailed constraints; avoid a second rewrite.

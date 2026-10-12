@@ -1,6 +1,7 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+
+import { PreviewImage } from "@/components/preview-image";
 
 export function ResultPanel({
   imageUrl,
@@ -39,7 +40,7 @@ export function ResultPanel({
         <span className="absolute left-3 top-3 rounded-md bg-[#d86f4b] px-2 py-1 text-xs font-medium text-white">
           最新生成
         </span>
-        <img
+        <PreviewImage
           alt="生成效果图"
           src={imageUrl}
           className="aspect-[4/5] w-full object-cover sm:aspect-[4/3]"

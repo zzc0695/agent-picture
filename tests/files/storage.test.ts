@@ -2,11 +2,21 @@
 
 import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const testRoot = path.join(process.cwd(), ".tmp-test-storage");
 
 describe("file storage", () => {
+  it.each([[1600, 900], [900, 1600], [1000, 1000]])("keeps the original room aspect ratio for %sx%s", async (width, height) => {
+    const { saveGeneratedImage, roomImageOutputSize } = await import("@/lib/files/storage");
+    const bytes = await sharp({ create: { width, height, channels: 3, background: "white" } }).png().toBuffer();
+    const url = await saveGeneratedImage(bytes);
+    const [w, h] = (await roomImageOutputSize(url))!.split("*").map(Number);
+    expect(w / h).toBeCloseTo(width / height, 1);
+    expect(w % 16).toBe(0);
+    expect(h % 16).toBe(0);
+  });
   beforeEach(async () => {
     process.env.LOCAL_FILE_ROOT = testRoot;
     await rm(testRoot, { recursive: true, force: true });

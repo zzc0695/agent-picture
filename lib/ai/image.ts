@@ -1,4 +1,4 @@
-import { geometryProtection } from "@/lib/prompt-templates";
+import { geometryProtection, geometryNegativePrompt } from "@/lib/prompt-templates";
 import {
   generateBailianImage,
   getBailianConfig,
@@ -9,6 +9,7 @@ import {
   saveGeneratedImage,
   toBailianImageReference,
   toAsyncImageReference,
+  roomImageOutputSize,
 } from "@/lib/files/storage";
 
 export async function prepareImageGeneration(input: {
@@ -27,30 +28,30 @@ export async function prepareImageGeneration(input: {
     throw new AiUnavailableError();
   }
 
-  const imageRoleText = input.referenceImageUrl
-    ? "图1是当前效果图，作为空间结构与构图基础；图2是窗帘整体款式；图3是材质细节。"
-    : "图1是原房间，图2是窗帘整体款式，图3是材质细节。";
+  const imageRoleText = "图1是原房间，图2是窗帘整体款式，图3是材质细节。图1是唯一的空间与家具布局基准；图2和图3仅提取窗帘，不复制其中的窗户、家具、摆件、背景装修或构图。";
   const prompt = [
     imageRoleText,
-    "生成一张真实摄影质感的软装效果图。",
+    "任务是对图1进行窗帘局部编辑，不是重新设计或重新拍摄房间。",
+    geometryProtection,
     "生成要求：" + input.optimizedPrompt,
     "样本还原度：" + input.fidelity,
     input.imageAnalysis ? "图片识别摘要：" + input.imageAnalysis : "",
     "必须保留原房间结构、窗户位置、透视角度和主要光线方向。",
-    geometryProtection,
   ]
     .filter(Boolean)
     .join("\n");
 
-  const baseImageUrl = input.referenceImageUrl ?? input.roomImageUrl;
-  const references = await Promise.all(
+  // Never chain generated rooms: even small layout errors would accumulate.
+  const baseImageUrl = input.roomImageUrl;
+  const [references, size] = await Promise.all([Promise.all(
     [baseImageUrl, input.styleImageUrl, input.detailImageUrl].map(asyncMode ? toAsyncImageReference : toBailianImageReference),
-  );
+  ), roomImageOutputSize(baseImageUrl)]);
   const content: BailianContentPart[] = references.map((image) => ({ image }));
 
   content.push({ text: prompt });
 
-  return { config, content, inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120) };
+  const negativePrompt = [geometryNegativePrompt, input.negativePrompt].filter(Boolean).join("，").slice(0, 500);
+  return { config, content, negativePrompt, size, inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120) };
 }
 
 export async function persistEffectImage(temporaryImageUrl: string) {
@@ -62,12 +63,12 @@ export async function persistEffectImage(temporaryImageUrl: string) {
 }
 
 export async function generateEffectImage(input: Parameters<typeof prepareImageGeneration>[0]) {
-  const { config, content, inputSummary } = await prepareImageGeneration(input);
+  const { config, content, negativePrompt, size, inputSummary } = await prepareImageGeneration(input);
   const temporaryImageUrl = await generateBailianImage(
     config.apiKey!,
     config.imageModel,
     content,
-    { negativePrompt: input.negativePrompt },
+    { negativePrompt, size },
   );
   const imageUrl = await persistEffectImage(temporaryImageUrl);
 

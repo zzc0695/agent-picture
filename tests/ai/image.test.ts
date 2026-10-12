@@ -18,6 +18,7 @@ vi.mock("@/lib/ai/bailian", () => ({
 vi.mock("@/lib/files/storage", () => ({
   saveGeneratedImage,
   toBailianImageReference,
+  roomImageOutputSize: vi.fn(async () => "1360*768"),
 }));
 
 describe("generateEffectImage", () => {
@@ -72,7 +73,7 @@ describe("generateEffectImage", () => {
           ),
         }),
       ],
-      { negativePrompt: "避免窗户变形" },
+      { negativePrompt: expect.stringContaining("避免窗户变形"), size: "1360*768" },
     );
     expect(fetch).toHaveBeenCalledWith("https://temporary.example/image.png", { signal: expect.any(AbortSignal) });
     expect(saveGeneratedImage).toHaveBeenCalledWith(
@@ -104,7 +105,7 @@ describe("generateEffectImage", () => {
     ).rejects.toThrow("无法下载图片生成结果");
   });
 
-  it("uses the current effect plus both material references for a similar result", async () => {
+  it("anchors repeated generations to the original room instead of a drifting generated result", async () => {
     process.env.DASHSCOPE_API_KEY = "test-key";
     generateBailianImage.mockResolvedValue("https://temporary.example/image.png");
     saveGeneratedImage.mockResolvedValue("/uploads/similar-effect.png");
@@ -131,14 +132,14 @@ describe("generateEffectImage", () => {
       "test-key",
       "qwen-image-3.0",
       [
-        { image: "data:image/jpeg;base64,/uploads/current-effect.png" },
+        { image: "data:image/jpeg;base64,/uploads/room.jpg" },
         { image: "data:image/jpeg;base64,/uploads/style.jpg" },
         { image: "data:image/jpeg;base64,/uploads/detail.jpg" },
         expect.objectContaining({
-          text: expect.stringContaining("图1是当前效果图"),
+          text: expect.stringContaining("图1是原房间"),
         }),
       ],
-      { negativePrompt: "" },
+      { negativePrompt: expect.stringContaining("家具移动"), size: "1360*768" },
     );
   });
   it("adds position protection even when the user supplies a short prompt", async () => {
