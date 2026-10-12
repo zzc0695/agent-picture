@@ -60,4 +60,35 @@ describe("durable image jobs", () => {
     await expect(startImageJob("m", input)).rejects.toThrow();
     expect(db.generationRecord.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "failed" }) }));
   });
+  it("keeps a pre-connection failure as one recoverable job", async () => {
+    vi.mocked(db.generationRecord.create).mockResolvedValue({...job,providerTaskId:null,status:'submitting',inputData:input} as never);
+    vi.mocked(submitBailianImage).mockRejectedValueOnce(new TypeError('fetch failed',{cause:{code:'UND_ERR_CONNECT_TIMEOUT'}}));
+    expect(await startImageJob('m',input)).toMatchObject({status:'submitting'});
+    expect(db.generationRecord.create).toHaveBeenCalledTimes(1);
+    expect(db.generationRecord.update).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({timings:expect.objectContaining({stage:'connection',attempts:1})})}));
+  });
+  it("retries under a lease without reserving another usage record", async () => {
+    vi.mocked(db.generationRecord.findFirst).mockResolvedValue({...job,status:'submitting',providerTaskId:null,inputData:input,timings:{stage:'connection',attempts:1,nextAttemptAt:0}} as never);
+    vi.mocked(db.generationRecord.updateMany).mockResolvedValue({count:1});
+    vi.mocked(submitBailianImage).mockResolvedValueOnce('new-provider');
+    expect(await pollImageJob('m','job')).toMatchObject({status:'running'});
+    expect(submitBailianImage).toHaveBeenCalledTimes(1);expect(db.generationRecord.create).not.toHaveBeenCalled();
+  });
+  it("does not submit when another poll holds the retry lease", async () => {
+    vi.mocked(db.generationRecord.findFirst).mockResolvedValue({...job,status:'submitting',providerTaskId:null,inputData:input,timings:{stage:'connection',attempts:1,nextAttemptAt:0}} as never);
+    vi.mocked(db.generationRecord.updateMany).mockResolvedValue({count:0});
+    await pollImageJob('m','job');expect(submitBailianImage).not.toHaveBeenCalled();
+  });
+  it("does not repeat a request whose submission outcome is uncertain", async () => {
+    vi.mocked(db.generationRecord.findFirst).mockResolvedValue({...job,status:'submitting',providerTaskId:null,inputData:input,timings:{stage:'retry_sending',attempts:2}} as never);
+    await pollImageJob('m','job');expect(submitBailianImage).not.toHaveBeenCalled();
+  });
+  it("stops after the third connection attempt", async () => {
+    vi.mocked(db.generationRecord.findFirst).mockResolvedValue({...job,status:'submitting',providerTaskId:null,inputData:input,timings:{stage:'connection',attempts:2,nextAttemptAt:0}} as never);
+    vi.mocked(db.generationRecord.updateMany).mockResolvedValue({count:1});
+    vi.mocked(submitBailianImage).mockRejectedValueOnce(new TypeError('fetch failed',{cause:{code:'UND_ERR_CONNECT_TIMEOUT'}}));
+    expect(await pollImageJob('m','job')).toMatchObject({status:'failed'});
+    expect(submitBailianImage).toHaveBeenCalledTimes(1);
+  });
+
 });

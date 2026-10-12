@@ -4,7 +4,6 @@ import { aiErrorResponse } from "@/lib/ai/http";
 import { requireMerchantSession, unauthorizedResponse } from "@/lib/auth/require-session";
 
 export const maxDuration = 90;
-export const preferredRegion = "hnd1";
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireMerchantSession();
   if (!session) return unauthorizedResponse();

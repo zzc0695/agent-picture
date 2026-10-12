@@ -127,7 +127,7 @@ export default function WorkbenchPage() {
           clearResult(); setImageUrl(job.imageUrl); localStorage.setItem("last-image-result", imageJobId);
           localStorage.removeItem("image-generation-job"); setImageJobId(""); setBusyAction(null); return;
         }
-        setActionNotice(`效果图正在生成，已等待 ${job.elapsedSeconds || 0} 秒。可以刷新页面后继续查看。`);
+        setActionNotice(job.status === "submitting" ? `正在连接生图服务，网络暂时不通时会有限自动重试，已等待 ${job.elapsedSeconds || 0} 秒。` : `效果图正在生成，已等待 ${job.elapsedSeconds || 0} 秒。可以刷新页面后继续查看。`);
         timer = setTimeout(poll, 5000);
     } catch (error) {
         if (stopped) return;

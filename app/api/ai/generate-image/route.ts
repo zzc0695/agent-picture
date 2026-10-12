@@ -5,7 +5,6 @@ import { requireMerchantSession, unauthorizedResponse } from "@/lib/auth/require
 import { imageGenerationRequestSchema } from "@/lib/validators";
 import { db } from "@/lib/db";
 export const maxDuration = 90;
-export const preferredRegion = "hnd1";
 export async function GET() {
   const session = await requireMerchantSession();
   if (!session) return unauthorizedResponse();
