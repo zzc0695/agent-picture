@@ -76,7 +76,7 @@ describe("Bailian text generation", () => {
       expect.objectContaining({
         model: "qwen3.7-flash",
         enable_thinking: false,
-        response_format: { type: "json_object" },
+        response_format: expect.objectContaining({ type: "json_schema", json_schema: expect.objectContaining({ strict: true, schema: expect.objectContaining({ additionalProperties: false, required: ["shortVideoScript", "socialCopy", "customerScript"], properties: expect.objectContaining({ shortVideoScript: expect.objectContaining({ type: "string" }) }) }) }) }),
       }),
     );
   });

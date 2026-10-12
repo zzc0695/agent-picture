@@ -39,7 +39,21 @@ export async function generateMarketingCopy(input: {
     model: config.textModel,
     messages: [{ role: "user", content: prompt }],
     enable_thinking: false,
-    response_format: { type: "json_object" },
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "marketing_copy", strict: true,
+        schema: {
+          type: "object", additionalProperties: false,
+          required: ["shortVideoScript", "socialCopy", "customerScript"],
+          properties: {
+            shortVideoScript: { type: "string", description: "分镜和旁白组成的完整短视频脚本文本" },
+            socialCopy: { type: "string", description: "可直接发布的社交文案文本" },
+            customerScript: { type: "string", description: "面向客户的方案说明文本" },
+          },
+        },
+      },
+    },
   };
   const response = await createBailianTextClient(
     config.apiKey,
