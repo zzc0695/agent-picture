@@ -13,4 +13,11 @@ describe("prompt construction", () => {
     expect(result).toContain("严格还原");
     expect(result).toContain("米白高遮光绒布窗帘");
   });
+  it("expands style into concrete construction and material directions", () => {
+    const result = buildOptimizedPromptInput({ userPrompt: "法式轻雅窗帘", fidelity: "balanced", materialSummary: "参考样本" });
+    expect(result).toContain("350–550");
+    expect(result).toContain("成组双褶或三褶");
+    expect(result).toContain("帘头与褶皱");
+    expect(result).toContain("不能覆盖已指定的样本");
+  });
 });

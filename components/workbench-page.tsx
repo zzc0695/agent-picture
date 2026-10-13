@@ -6,9 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Download, Image as ImageIcon, RefreshCw, Sparkles, UploadCloud } from "lucide-react";
 import { MaterialPicker } from "@/components/material-picker";
+import { curtainCraftGuide } from "@/lib/curtain-design";
 
 const roomPrompt =
-  "保留原房间的结构、家具、窗户位置和光线方向，仅调整窗帘。参考整体款式图的造型与配色，以及材质细节图的纹理与垂感，生成真实自然的窗帘上墙效果。";
+  "保留原房间的结构、家具、窗户位置和光线方向，仅调整窗帘。款式图决定帘头、褶皱、层次和配色，材质近照决定织纹、图案、光泽与垂感。准确呈现参考窗帘从顶部收束到下方自然展开的形态，布纱层次清楚，色彩以样本为准，成品像在同一房间完成窗帘安装后的真实照片。\n\n" + curtainCraftGuide;
 
 const materialSummary = "请参考商家上传的款式与材质图片；未识别的颜色、成分及遮光性能不作断言。";
 const demoRoomImageUrl =

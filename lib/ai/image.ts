@@ -6,6 +6,7 @@ import {
 } from "@/lib/ai/bailian";
 import { AiUnavailableError } from "@/lib/ai/errors";
 import { describeRoomLayout } from "@/lib/ai/room-layout";
+import { curtainCraftGuide, curtainStyleDirection, samplePriorityGuide } from "@/lib/curtain-design";
 import {
   saveGeneratedImage,
   toBailianImageReference,
@@ -40,12 +41,16 @@ export async function prepareImageGeneration(input: {
     catch { console.info(JSON.stringify({ event: "room_layout_observation_unavailable" })); }
   }
   const imageRoleText = "图1是原房间，图2是窗帘整体款式，图3是材质细节。图1是唯一的空间与家具布局基准；图2和图3仅提取窗帘，不复制其中的窗户、家具、摆件、背景装修或构图。";
+  const styleDirection = curtainStyleDirection(input.optimizedPrompt);
   const prompt = [
     imageRoleText,
     "任务是对图1进行窗帘局部编辑，不是重新设计或重新拍摄房间。",
     geometryProtection,
     spatialGuide ?? "",
     "生成要求：" + input.optimizedPrompt.replaceAll(geometryProtection, "").trim(),
+    styleDirection && !input.optimizedPrompt.includes(styleDirection) ? styleDirection : "",
+    !input.optimizedPrompt.includes(curtainCraftGuide) ? curtainCraftGuide : "",
+    !input.optimizedPrompt.includes(samplePriorityGuide) ? samplePriorityGuide : "",
     "样本还原度：" + input.fidelity,
     input.imageAnalysis ? "图片识别摘要：" + input.imageAnalysis : "",
     "必须保留原房间结构、窗户位置、透视角度和主要光线方向。",
