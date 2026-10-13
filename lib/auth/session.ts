@@ -11,12 +11,14 @@ export type MerchantSession = {
 };
 
 export const sessionCookieName = cookieName;
+export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 3600;
 
 export async function createSessionToken(session: MerchantSession) {
+  const issuedAt = Math.floor(Date.now() / 1000);
   return new SignJWT(session)
     .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("7d")
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + SESSION_MAX_AGE_SECONDS)
     .sign(secret);
 }
 

@@ -6,6 +6,7 @@ import {
   getBailianConfig,
 } from "@/lib/ai/bailian";
 import { toAsyncImageReference } from "@/lib/files/storage";
+import { sampleObservationGuide } from "./sample-observation";
 import {
   materialAnalysisRequestSchema,
   materialAnalysisResultSchema,
@@ -24,6 +25,7 @@ type BailianVisionRequest = OpenAI.ChatCompletionCreateParamsNonStreaming & {
 const analysisInstruction = [
   "你是软装窗帘方案分析师。请严格按照图片顺序分析：图1是客户房间，图2是窗帘整体款式，图3是面料材质细节。",
   "识别房间类型、布局、窗户结构、光线和主色调；识别窗帘层次、褶皱、轨道和配色；识别面料颜色、纹理、厚度、遮光感和白纱特征。",
+  sampleObservationGuide,
   "只返回 JSON 对象，不要返回 Markdown。必须包含四个非空字符串字段：roomSummary、styleSummary、materialSummary、templatePrompt。",
   "templatePrompt 必须是一段可直接编辑并用于生成真实软装效果图的中文文案，并明确要求保留原房间结构、窗户位置、透视和光线方向。",
 ].join("\n");

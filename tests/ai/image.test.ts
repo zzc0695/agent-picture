@@ -152,6 +152,8 @@ describe("generateEffectImage", () => {
     const text=result.content.find(part=>'text' in part)?.text;
     expect(text).toContain('不移动床、沙发、桌椅');
     expect(text).toContain('只调整原窗户对应的窗帘区域');
+    expect(text).toContain('号码牌、价格牌');
+    expect(result.negativePrompt).toContain('品牌logo牌');
     expect(text).toContain('沙发在画面左侧');
     expect(createGroundedPrompt).toHaveBeenCalledWith(['data:image/jpeg;base64,/room.png','data:image/jpeg;base64,/style.png','data:image/jpeg;base64,/detail.png'], '换成蓝色', 'balanced');
   });

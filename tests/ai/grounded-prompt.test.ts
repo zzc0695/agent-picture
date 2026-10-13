@@ -5,11 +5,14 @@ vi.mock("@/lib/ai/bailian", () => ({ getBailianConfig: () => ({apiKey:"test",tex
 import { createGroundedPrompt } from "@/lib/ai/grounded-prompt";
 describe("image-grounded prompt writing", () => {
   it("reads all three images before returning an actual-image design", async () => {
-    create.mockResolvedValue({text:JSON.stringify({roomSummary:"左侧窗，沙发在前景",styleSummary:"灰色打孔单层帘",materialSummary:"素面哑光细织纹",optimizedPrompt:"沿左侧窗原杆安装灰色打孔单层帘，保留素面哑光细织纹与沙发前景遮挡。",negativePrompt:"不改成提花或双层"})});
+    create.mockResolvedValue({text:JSON.stringify({roomSummary:"左侧窗，沙发在前景",styleSummary:"灰色打孔单层帘",materialSummary:"素面哑光细织纹",optimizedPrompt:"沿左侧窗原杆安装灰色打孔单层帘，保留素面哑光细织纹与沙发前景遮挡。",negativePrompt:"不改成提花或双层",excludedSampleItems:["悬挂货号牌","价格牌"]})});
     const result=await createGroundedPrompt(['room','style','fabric'],'法式','strict');
     expect(create.mock.calls[0][0].messages[0].content.slice(0,3)).toEqual(['room','style','fabric'].map(url=>({type:'image_url',image_url:{url}})));
     expect(result.optimizedPrompt).toContain('打孔单层');
     expect(result.materialSummary).toContain('素面');
+    expect(result.excludedSampleItems).toEqual(['悬挂货号牌','价格牌']);
+    expect(create.mock.calls[0][0].messages[0].content[3].text).toContain('不能拿牌面当纹样');
+    expect(create.mock.calls[0][0].messages[0].content[3].text).toContain('从另一张样本图交叉确认');
     expect(create.mock.calls[0][0].messages[0].content[3].text).toContain('先观察');
   });
   it("rejects a generic prompt without the image observations", async () => {

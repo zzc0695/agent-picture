@@ -6,6 +6,7 @@ import {
 } from "@/lib/ai/bailian";
 import { AiUnavailableError } from "@/lib/ai/errors";
 import { createGroundedPrompt } from "@/lib/ai/grounded-prompt";
+import { sampleObservationGuide, sampleExclusionNegative } from "@/lib/ai/sample-observation";
 import {
   saveGeneratedImage,
   toBailianImageReference,
@@ -42,6 +43,7 @@ export async function prepareImageGeneration(input: {
     imageRoleText,
     "任务是对图1进行窗帘局部编辑，不是重新设计或重新拍摄房间。",
     geometryProtection,
+    sampleObservationGuide,
     spatialGuide ?? "",
     "依据实际图片形成的生成要求：" + groundedPrompt.replaceAll(geometryProtection, "").trim(),
     "样本还原度：" + input.fidelity,
@@ -55,7 +57,7 @@ export async function prepareImageGeneration(input: {
 
   content.push({ text: prompt });
 
-  const negativePrompt = [geometryNegativePrompt, observed?.negativePrompt, input.negativePrompt].filter(Boolean).join("，").slice(0, 500);
+  const negativePrompt = [geometryNegativePrompt, sampleExclusionNegative, observed?.negativePrompt, input.negativePrompt].filter(Boolean).join("，").slice(0, 500);
   return { config, content, negativePrompt, size, groundedPrompt, inputSummary: input.fidelity + ": " + groundedPrompt.slice(0, 120) };
 }
 

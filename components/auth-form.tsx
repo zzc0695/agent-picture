@@ -25,6 +25,7 @@ export function AuthForm({ register = false }: { register?: boolean }) {
       <label htmlFor="email" className="block text-sm">邮箱</label><input id="email" name="email" type="email" autoComplete="username" required disabled={pending} className="w-full rounded-md border p-3" />
       <label htmlFor="password" className="block text-sm">密码</label><input id="password" name="password" type="password" autoComplete={register ? "new-password" : "current-password"} minLength={register ? 8 : undefined} maxLength={72} required disabled={pending} className="w-full rounded-md border p-3" />
       {register && <p className="text-xs text-stone-500">至少 8 位。注册后即可开始制作方案。</p>}
+      {!register && <p className="text-xs text-stone-500">登录后在此浏览器保持 30 天，无需每天重新登录。</p>}
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <button disabled={pending} className="studio-primary-button w-full p-3">{pending ? (register ? "注册中..." : "登录中...") : (register ? "注册并开始使用" : "登录")}</button>
     </form>
