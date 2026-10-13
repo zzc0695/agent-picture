@@ -5,6 +5,7 @@ import { POST as optimizePromptPost } from "@/app/api/ai/optimize-prompt/route";
 import { analyzeMaterials } from "@/lib/ai/material-analysis";
 import { startImageJob } from "@/lib/ai/image-jobs";
 import { optimizePrompt } from "@/lib/ai/prompt";
+import { createGroundedPrompt } from "@/lib/ai/grounded-prompt";
 import { db } from "@/lib/db";
 import { MaterialImageInputError } from "@/lib/files/storage";
 import { AiUnavailableError } from "@/lib/ai/errors";
@@ -40,6 +41,8 @@ vi.mock("@/lib/ai/material-analysis", () => ({
 vi.mock("@/lib/ai/prompt", () => ({
   optimizePrompt: vi.fn(),
 }));
+vi.mock("@/lib/ai/grounded-prompt", () => ({ createGroundedPrompt: vi.fn() }));
+vi.mock("@/lib/files/storage", async (original) => ({ ...await original<typeof import("@/lib/files/storage")>(), toAsyncImageReference: vi.fn(async (url: string) => `validated:${url}`) }));
 
 function jsonRequest(url: string, body: unknown) {
   return new Request(url, {
@@ -50,6 +53,18 @@ function jsonRequest(url: string, body: unknown) {
 }
 
 describe("AI API routes", () => {
+  it("requires actual images before optimizing a prompt", async () => {
+    const response = await optimizePromptPost(jsonRequest("http://localhost/api/ai/optimize-prompt", {userPrompt:"法式窗帘",fidelity:"balanced"}));
+    expect(response.status).toBe(400);
+    expect(createGroundedPrompt).not.toHaveBeenCalled();
+  });
+  it("passes the current three images to vision and returns their observations with the prompt", async () => {
+    vi.mocked(createGroundedPrompt).mockResolvedValue({roomSummary:"左侧窗户",styleSummary:"蓝色打孔帘",materialSummary:"素面细织纹",optimizedPrompt:"根据蓝色打孔帘与实际细织纹设计",negativePrompt:"不移家具"});
+    const response = await optimizePromptPost(jsonRequest("http://localhost/api/ai/optimize-prompt", {userPrompt:"法式窗帘",fidelity:"balanced",roomImageUrl:"/room.png",styleImageUrl:"/style.png",detailImageUrl:"/fabric.png"}));
+    expect(response.status).toBe(200);
+    expect(createGroundedPrompt).toHaveBeenCalledWith(["validated:/room.png","validated:/style.png","validated:/fabric.png"],"法式窗帘","balanced");
+    expect((await response.json()).styleSummary).toBe("蓝色打孔帘");
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(db.generationRecord.create).mockResolvedValue({ id: "record" } as never);

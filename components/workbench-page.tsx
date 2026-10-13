@@ -111,7 +111,7 @@ export default function WorkbenchPage() {
         if (!response.ok) { setActionNotice("查询暂时失败，将自动继续查询；无需重复生成"); timer = setTimeout(poll, 10000); return; }
         if (!restored && job.input) {
           setRoomImageUrl(job.input.roomImageUrl); setStyleImageUrl(job.input.styleImageUrl); setDetailImageUrl(job.input.detailImageUrl);
-          setPrompt(job.input.optimizedPrompt); setOriginalPrompt(job.input.originalPrompt || job.input.optimizedPrompt);
+          setPrompt(job.effectivePrompt || job.input.optimizedPrompt); setOriginalPrompt(job.input.originalPrompt || job.input.optimizedPrompt);
           setNegativePrompt(job.input.negativePrompt || ""); setFidelity(job.input.fidelity);
           setImageAnalysis(job.input.imageAnalysis ? JSON.parse(job.input.imageAnalysis) : null);
           if (job.input.customerName) setCustomerName(job.input.customerName);
@@ -187,7 +187,7 @@ export default function WorkbenchPage() {
   }
 
   async function optimizePrompt() {
-    if (busyAction || !prompt.trim()) return;
+    if (busyAction || !inputReady || !prompt.trim()) return;
     setBusyAction("optimize");
     setActionError("");
     try {
@@ -196,6 +196,9 @@ export default function WorkbenchPage() {
         negativePrompt: string;
       }>("/api/ai/optimize-prompt", {
         userPrompt: prompt,
+        roomImageUrl,
+        styleImageUrl,
+        detailImageUrl,
         materialSummary: imageAnalysis
           ? `${imageAnalysis.styleSummary}；${imageAnalysis.materialSummary}`
           : materialSummary,
@@ -288,7 +291,7 @@ export default function WorkbenchPage() {
     setBusyAction("generate");
     setActionError("");
     try {
-      const result = await postJson<{ jobId: string }>(
+      const result = await postJson<{ jobId: string; effectivePrompt?: string }>(
         "/api/ai/generate-image",
         {
           roomImageUrl,
@@ -305,6 +308,7 @@ export default function WorkbenchPage() {
         },
       );
       if (!result.jobId) throw new Error("未收到任务编号，请重试");
+      if (result.effectivePrompt) setPrompt(result.effectivePrompt);
       clearResult();
       localStorage.setItem("image-generation-job", result.jobId);
       window.history.replaceState(null, "", `/?jobId=${encodeURIComponent(result.jobId)}`);
@@ -477,7 +481,7 @@ export default function WorkbenchPage() {
           <div className="mt-5 space-y-4">
             <MaterialPicker disabled={busy} styleImageUrl={styleImageUrl} detailImageUrl={detailImageUrl} onSelect={(id, url, role) => { setPreviews(current => ({ ...current, [role]: "" })); if (role === "style") setStyleImageUrl(url); else setDetailImageUrl(url); materialSlots.current[role] = id; setMaterialIds([...new Set(Object.values(materialSlots.current).filter(Boolean))]); setImageAnalysis(null); setNegativePrompt(""); setAnalysisError(""); clearResult(); }} />
             <label className="block text-sm text-stone-700">样本还原度<select className="workbench-input mt-2" value={fidelity} disabled={busy} onChange={event => { setFidelity(event.target.value as Fidelity); setNegativePrompt(""); clearResult(); }}><option value="balanced">平衡（默认）</option><option value="strict">严格还原</option><option value="creative">创意发挥</option></select></label>
-            <div className="flex flex-wrap gap-3"><button disabled={busy || !inputReady} onClick={() => void analyzeUploadedImages()} className="studio-secondary-button px-4">{busyAction === "analyze" ? "识别中..." : "识别图片补充要求"}</button><button disabled={busy || !prompt.trim()} onClick={() => void optimizePrompt()} className="studio-secondary-button px-4">{busyAction === "optimize" ? "润色中..." : "AI 润色要求"}</button></div>
+            <div className="flex flex-wrap gap-3"><button disabled={busy || !inputReady} onClick={() => void analyzeUploadedImages()} className="studio-secondary-button px-4">{busyAction === "analyze" ? "识别中..." : "识别图片补充要求"}</button><button disabled={busy || !inputReady || !prompt.trim()} onClick={() => void optimizePrompt()} className="studio-secondary-button px-4">{busyAction === "optimize" ? "润色中..." : "AI 润色要求"}</button></div>
             {analysisError && <p role="alert" className="text-sm text-red-600">{analysisError}</p>}
             {imageAnalysis && <p className="text-xs leading-6 text-stone-500">{imageAnalysis.materialSummary}</p>}
           </div>

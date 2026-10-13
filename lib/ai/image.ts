@@ -5,8 +5,7 @@ import {
   type BailianContentPart,
 } from "@/lib/ai/bailian";
 import { AiUnavailableError } from "@/lib/ai/errors";
-import { describeRoomLayout } from "@/lib/ai/room-layout";
-import { curtainCraftGuide, curtainStyleDirection, samplePriorityGuide } from "@/lib/curtain-design";
+import { createGroundedPrompt } from "@/lib/ai/grounded-prompt";
 import {
   saveGeneratedImage,
   toBailianImageReference,
@@ -23,7 +22,7 @@ export async function prepareImageGeneration(input: {
   fidelity: string;
   imageAnalysis: string;
   referenceImageUrl?: string;
-  spatialGuide?: string;
+  groundedPrompt?: string;
 }, asyncMode = false) {
   const config = getBailianConfig();
 
@@ -35,24 +34,17 @@ export async function prepareImageGeneration(input: {
   const [references, size] = await Promise.all([Promise.all(
     [baseImageUrl, input.styleImageUrl, input.detailImageUrl].map(asyncMode ? toAsyncImageReference : toBailianImageReference),
   ), roomImageOutputSize(baseImageUrl)]);
-  let spatialGuide = input.spatialGuide;
-  if (!spatialGuide) {
-    try { spatialGuide = await describeRoomLayout(references[0]); }
-    catch { console.info(JSON.stringify({ event: "room_layout_observation_unavailable" })); }
-  }
+  const observed = input.groundedPrompt ? null : await createGroundedPrompt(references, input.optimizedPrompt, input.fidelity as "strict" | "balanced" | "creative");
+  const groundedPrompt = input.groundedPrompt ?? observed!.optimizedPrompt;
+  const spatialGuide = observed ? `实际图片识别：\n房间：${observed.roomSummary}\n款式：${observed.styleSummary}\n材质：${observed.materialSummary}` : "";
   const imageRoleText = "图1是原房间，图2是窗帘整体款式，图3是材质细节。图1是唯一的空间与家具布局基准；图2和图3仅提取窗帘，不复制其中的窗户、家具、摆件、背景装修或构图。";
-  const styleDirection = curtainStyleDirection(input.optimizedPrompt);
   const prompt = [
     imageRoleText,
     "任务是对图1进行窗帘局部编辑，不是重新设计或重新拍摄房间。",
     geometryProtection,
     spatialGuide ?? "",
-    "生成要求：" + input.optimizedPrompt.replaceAll(geometryProtection, "").trim(),
-    styleDirection && !input.optimizedPrompt.includes(styleDirection) ? styleDirection : "",
-    !input.optimizedPrompt.includes(curtainCraftGuide) ? curtainCraftGuide : "",
-    !input.optimizedPrompt.includes(samplePriorityGuide) ? samplePriorityGuide : "",
+    "依据实际图片形成的生成要求：" + groundedPrompt.replaceAll(geometryProtection, "").trim(),
     "样本还原度：" + input.fidelity,
-    input.imageAnalysis ? "图片识别摘要：" + input.imageAnalysis : "",
     "必须保留原房间结构、窗户位置、透视角度和主要光线方向。",
   ]
     .filter(Boolean)
@@ -63,8 +55,8 @@ export async function prepareImageGeneration(input: {
 
   content.push({ text: prompt });
 
-  const negativePrompt = [geometryNegativePrompt, input.negativePrompt].filter(Boolean).join("，").slice(0, 500);
-  return { config, content, negativePrompt, size, spatialGuide, inputSummary: input.fidelity + ": " + input.optimizedPrompt.slice(0, 120) };
+  const negativePrompt = [geometryNegativePrompt, observed?.negativePrompt, input.negativePrompt].filter(Boolean).join("，").slice(0, 500);
+  return { config, content, negativePrompt, size, groundedPrompt, inputSummary: input.fidelity + ": " + groundedPrompt.slice(0, 120) };
 }
 
 export async function persistEffectImage(temporaryImageUrl: string) {

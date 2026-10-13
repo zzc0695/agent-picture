@@ -9,6 +9,7 @@ import { reserveUsage } from "@/lib/usage";
 function view(job: GenerationRecord) {
   return { jobId: job.id, status: job.status, imageUrl: job.resultImageUrl, inputSummary: job.inputSummary,
     sourcePlanId: job.planId,
+    effectivePrompt: typeof job.timings === "object" && job.timings !== null && "groundedPrompt" in job.timings ? job.timings.groundedPrompt : undefined,
     input: job.inputData, error: job.failureReason, elapsedSeconds: Math.round((Date.now() - job.createdAt.getTime()) / 1000) };
 }
 export async function startImageJob(merchantId: string, body: unknown) {
@@ -22,20 +23,20 @@ export async function startImageJob(merchantId: string, body: unknown) {
   const started = Date.now();
   let stage = "references";
   let referenceMs = 0;
-  let spatialGuide: string | undefined;
+  let groundedPrompt: string | undefined;
   try {
     const prepared = await prepareImageGeneration(input, true);
     const { config, content, negativePrompt, size } = prepared;
-    spatialGuide = prepared.spatialGuide;
+    groundedPrompt = prepared.groundedPrompt;
     referenceMs = Date.now() - started;
     stage = "submission";
     const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt, size });
     return view(await db.generationRecord.update({ where: { id: job.id }, data: {
-      status: "running", providerTaskId, timings: { referenceMs, submissionMs: Date.now() - started - referenceMs, ...(spatialGuide ? { spatialGuide } : {}) } } }));
+      status: "running", providerTaskId, timings: { referenceMs, submissionMs: Date.now() - started - referenceMs, ...(groundedPrompt ? { groundedPrompt } : {}) } } }));
   } catch (error) {
     if (stage === "submission" && isPreRequestConnectionFailure(error)) {
       return view(await db.generationRecord.update({ where: { id: job.id }, data: { status: "submitting", leaseUntil: null,
-        failureReason: "连接暂时失败，正在等待自动重试", timings: { stage: "connection", attempts: 1, nextAttemptAt: Date.now() + 10000, referenceMs, ...(spatialGuide ? { spatialGuide } : {}) } } }));
+        failureReason: "连接暂时失败，正在等待自动重试", timings: { stage: "connection", attempts: 1, nextAttemptAt: Date.now() + 10000, referenceMs, ...(groundedPrompt ? { groundedPrompt } : {}) } } }));
     }
     await db.generationRecord.update({ where: { id: job.id }, data: { status: "failed",
       failureReason: "参考图读取或任务提交失败，请检查图片后重试", timings: { stage, referenceMs, totalMs: Date.now() - started } } });
@@ -64,7 +65,7 @@ export async function pollImageJob(merchantId: string, id: string) {
     if (!claimed.count) return view(job);
     try {
       const input = imageGenerationRequestSchema.parse(job.inputData);
-      const { config, content, negativePrompt, size } = await prepareImageGeneration({ ...input, spatialGuide: typeof timings.spatialGuide === "string" ? timings.spatialGuide : undefined }, true);
+      const { config, content, negativePrompt, size } = await prepareImageGeneration({ ...input, groundedPrompt: typeof timings.groundedPrompt === "string" ? timings.groundedPrompt : undefined }, true);
       const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt, size });
       return view(await db.generationRecord.update({ where: { id }, data: { status: "running", providerTaskId, leaseUntil: null,
         failureReason: null, timings: { ...timings, stage: "model", attempts } } }));

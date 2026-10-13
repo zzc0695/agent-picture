@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const generateBailianImage = vi.hoisted(() => vi.fn());
 const saveGeneratedImage = vi.hoisted(() => vi.fn());
 const toBailianImageReference = vi.hoisted(() => vi.fn());
-const describeRoomLayout = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/ai/room-layout", () => ({ describeRoomLayout }));
+const createGroundedPrompt = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/ai/grounded-prompt", () => ({ createGroundedPrompt }));
 
 vi.mock("@/lib/ai/bailian", () => ({
   getBailianConfig: () => ({
@@ -33,7 +33,7 @@ describe("generateEffectImage", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    describeRoomLayout.mockResolvedValue("保留原位：沙发在画面左侧，茶几位于前景中央，窗帘在沙发后面");
+    createGroundedPrompt.mockResolvedValue({roomSummary:"沙发在画面左侧，茶几位于前景中央，窗帘在沙发后面",styleSummary:"米白单层帘",materialSummary:"细密哑光织纹",optimizedPrompt:"按实际米白款式和细密织纹生成窗帘，保留原位：床位于窗户左侧",negativePrompt:"不移动家具"});
     delete process.env.DASHSCOPE_API_KEY;
     toBailianImageReference.mockImplementation(async (url: string) => {
       return "data:image/jpeg;base64," + url;
@@ -85,7 +85,7 @@ describe("generateEffectImage", () => {
     );
     expect(result).toEqual({
       imageUrl: "/uploads/generated-effect.png",
-      inputSummary: "balanced: 米白窗帘，真实摄影质感",
+      inputSummary: expect.stringContaining("按实际米白款式"),
     });
   });
 
@@ -153,23 +153,23 @@ describe("generateEffectImage", () => {
     expect(text).toContain('不移动床、沙发、桌椅');
     expect(text).toContain('只调整原窗户对应的窗帘区域');
     expect(text).toContain('沙发在画面左侧');
-    expect(describeRoomLayout).toHaveBeenCalledWith('data:image/jpeg;base64,/room.png');
+    expect(createGroundedPrompt).toHaveBeenCalledWith(['data:image/jpeg;base64,/room.png','data:image/jpeg;base64,/style.png','data:image/jpeg;base64,/detail.png'], '换成蓝色', 'balanced');
   });
 
   it("reuses automatic room observations during a submission retry", async () => {
     process.env.DASHSCOPE_API_KEY = 'test-key';
     const { prepareImageGeneration } = await import('@/lib/ai/image');
-    const result = await prepareImageGeneration({ roomImageUrl:'/room.png',styleImageUrl:'/style.png',detailImageUrl:'/detail.png',optimizedPrompt:'蓝色窗帘',negativePrompt:'',fidelity:'balanced',imageAnalysis:'',spatialGuide:'保留原位：床位于窗户左侧' });
-    expect(describeRoomLayout).not.toHaveBeenCalled();
+    const result = await prepareImageGeneration({ roomImageUrl:'/room.png',styleImageUrl:'/style.png',detailImageUrl:'/detail.png',optimizedPrompt:'蓝色窗帘',negativePrompt:'',fidelity:'balanced',imageAnalysis:'',groundedPrompt:'保留原位：床位于窗户左侧' });
+    expect(createGroundedPrompt).not.toHaveBeenCalled();
     expect(result.content.find(part => 'text' in part)?.text).toContain('床位于窗户左侧');
   });
 
-  it("still generates with the original-room constraints when observation is unavailable", async () => {
+  it("does not submit a generation when image recognition fails", async () => {
     process.env.DASHSCOPE_API_KEY = 'test-key';
-    describeRoomLayout.mockRejectedValue(new Error('timeout'));
+    createGroundedPrompt.mockRejectedValue(new Error('timeout'));
     const { prepareImageGeneration } = await import('@/lib/ai/image');
-    const result = await prepareImageGeneration({ roomImageUrl:'/room.png',styleImageUrl:'/style.png',detailImageUrl:'/detail.png',optimizedPrompt:'蓝色窗帘',negativePrompt:'',fidelity:'balanced',imageAnalysis:'' });
-    expect(result.content.find(part => 'text' in part)?.text).toContain('不移动床、沙发、桌椅');
+    await expect(prepareImageGeneration({ roomImageUrl:'/room.png',styleImageUrl:'/style.png',detailImageUrl:'/detail.png',optimizedPrompt:'蓝色窗帘',negativePrompt:'',fidelity:'balanced',imageAnalysis:'' })).rejects.toThrow('timeout');
+    expect(generateBailianImage).not.toHaveBeenCalled();
   });
 
 });

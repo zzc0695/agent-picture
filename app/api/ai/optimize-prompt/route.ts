@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { optimizePrompt } from "@/lib/ai/prompt";
+import { createGroundedPrompt } from "@/lib/ai/grounded-prompt";
+import { toAsyncImageReference } from "@/lib/files/storage";
 import { aiErrorResponse } from "@/lib/ai/http";
 import {
   requireMerchantSession,
   unauthorizedResponse,
 } from "@/lib/auth/require-session";
 import { trackedText } from "@/lib/ai/tracked-text";
-import { fidelitySchema } from "@/lib/validators";
+import { fidelitySchema, materialAnalysisRequestSchema } from "@/lib/validators";
 
 export const maxDuration = 60;
 
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   if (!userPrompt.trim()) {
     return NextResponse.json({ error: "请先填写生成要求" }, { status: 400 });
   }
-  const materialSummary = String(body.materialSummary ?? "");
+  const images = materialAnalysisRequestSchema.safeParse(body);
   const parsedFidelity = fidelitySchema.safeParse(body.fidelity ?? "strict");
   if (!parsedFidelity.success) {
     return NextResponse.json(
@@ -28,8 +29,12 @@ export async function POST(request: Request) {
   }
 
   const fidelity = parsedFidelity.data;
+  if (!images.success) return NextResponse.json({ error: "请先上传房间图、款式图和材质图，再根据图片润色要求" }, { status: 400 });
   try {
-    const result = await trackedText(session.merchantId, "prompt_optimization", userPrompt, () => optimizePrompt({ userPrompt, materialSummary, fidelity }));
+    const result = await trackedText(session.merchantId, "prompt_optimization", userPrompt, async () => {
+      const references = await Promise.all([images.data.roomImageUrl, images.data.styleImageUrl, images.data.detailImageUrl].map(toAsyncImageReference));
+      return createGroundedPrompt(references, userPrompt, fidelity);
+    });
 
     return NextResponse.json(result);
   } catch (error) {
