@@ -62,7 +62,7 @@ describe("AI API routes", () => {
     vi.mocked(createGroundedPrompt).mockResolvedValue({roomSummary:"左侧窗户",styleSummary:"蓝色打孔帘",materialSummary:"素面细织纹",optimizedPrompt:"根据蓝色打孔帘与实际细织纹设计",negativePrompt:"不移家具",excludedSampleItems:[]});
     const response = await optimizePromptPost(jsonRequest("http://localhost/api/ai/optimize-prompt", {userPrompt:"法式窗帘",fidelity:"balanced",roomImageUrl:"/room.png",styleImageUrl:"/style.png",detailImageUrl:"/fabric.png"}));
     expect(response.status).toBe(200);
-    expect(createGroundedPrompt).toHaveBeenCalledWith(["validated:/room.png","validated:/style.png","validated:/fabric.png"],"法式窗帘","balanced");
+    expect(createGroundedPrompt).toHaveBeenCalledWith(["validated:/room.png","validated:/style.png","validated:/fabric.png"],"法式窗帘","balanced",[]);
     expect((await response.json()).styleSummary).toBe("蓝色打孔帘");
   });
   beforeEach(() => {
@@ -152,6 +152,7 @@ describe("AI API routes", () => {
       roomImageUrl: "/uploads/room.jpg",
       styleImageUrl: "/uploads/style.jpg",
       detailImageUrl: "/uploads/detail.jpg",
+      supplementalImages: [],
     });
     expect(db.generationRecord.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ type: "material_analysis" }),

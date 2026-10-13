@@ -7,6 +7,7 @@ import {
 } from "@/lib/ai/bailian";
 import { toAsyncImageReference } from "@/lib/files/storage";
 import { sampleObservationGuide } from "./sample-observation";
+import type { SupplementalImage } from "@/lib/photo-types";
 import {
   materialAnalysisRequestSchema,
   materialAnalysisResultSchema,
@@ -16,6 +17,7 @@ type MaterialAnalysisInput = {
   roomImageUrl: string;
   styleImageUrl: string;
   detailImageUrl: string;
+  supplementalImages?: SupplementalImage[];
 };
 
 type BailianVisionRequest = OpenAI.ChatCompletionCreateParamsNonStreaming & {
@@ -50,13 +52,14 @@ export async function analyzeMaterials(input: MaterialAnalysisInput) {
     toAsyncImageReference(parsedInput.roomImageUrl),
     toAsyncImageReference(parsedInput.styleImageUrl),
     toAsyncImageReference(parsedInput.detailImageUrl),
+    ...parsedInput.supplementalImages.map(photo => toAsyncImageReference(photo.url)),
   ]);
   const content: OpenAI.ChatCompletionContentPart[] = [
     ...imageUrls.map((url) => ({
       type: "image_url" as const,
       image_url: { url },
     })),
-    { type: "text", text: analysisInstruction },
+    { type: "text", text: [analysisInstruction,...parsedInput.supplementalImages.map((photo,index)=>`图${index+4}是${photo.role}补图，用于确认主图缺失或模糊的细节，不复制补图背景。`)].join("\n") },
   ];
   const request: BailianVisionRequest = {
     model: config.textModel,

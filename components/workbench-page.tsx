@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Download, Image as ImageIcon, RefreshCw, Sparkles, UploadCloud } from "lucide-react";
 import { MaterialPicker } from "@/components/material-picker";
+import { PhotoAssist } from "@/components/photo-assist";
+import type { SupplementalImage } from "@/lib/photo-types";
 import { curtainCraftGuide } from "@/lib/curtain-design";
 
 const roomPrompt =
@@ -42,6 +44,8 @@ export default function WorkbenchPage() {
   const [roomImageUrl, setRoomImageUrl] = useState(demoRoomImageUrl);
   const [styleImageUrl, setStyleImageUrl] = useState(demoSampleImageUrl);
   const [detailImageUrl, setDetailImageUrl] = useState(demoDetailImageUrl);
+  const [supplementalImages,setSupplementalImages]=useState<SupplementalImage[]>([]);
+  const [supplementUploading,setSupplementUploading]=useState(false);
   const [imageAnalysis, setImageAnalysis] = useState<MaterialAnalysis | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [imageJobId, setImageJobId] = useState("");
@@ -62,7 +66,7 @@ export default function WorkbenchPage() {
   const uploadLocks = useRef(new Set<string>());
   const previewUrls = useRef<Record<string,string>>({});
   useEffect(() => () => { Object.values(previewUrls.current).forEach(url => URL.revokeObjectURL(url)); }, []);
-  const uploading = Object.values(uploads).some(Boolean);
+  const uploading = Object.values(uploads).some(Boolean) || supplementUploading;
   const inputReady = Boolean(roomImageUrl && styleImageUrl && detailImageUrl) && !uploading;
 
   useEffect(() => {
@@ -83,6 +87,7 @@ export default function WorkbenchPage() {
         setRoomImageUrl(plan.roomImageUrl); setStyleImageUrl(plan.styleImageUrl || plan.sampleImageUrl); setDetailImageUrl(plan.detailImageUrl || plan.sampleImageUrl);
         setPrompt(plan.optimizedPrompt || plan.originalPrompt); setOriginalPrompt(plan.originalPrompt); setNegativePrompt(plan.negativePrompt); setFidelity(plan.fidelity);
         setImageAnalysis(plan.imageAnalysis ? JSON.parse(plan.imageAnalysis) : null);
+        setSupplementalImages(plan.imageAnalysis ? JSON.parse(plan.imageAnalysis).supplementalImages || [] : []);
         setMaterialIds(plan.materials?.map((item: { materialId: string }) => item.materialId) || []);
         materialSlots.current = { style: plan.materials?.find((item: { material: { imageUrl: string } }) => item.material.imageUrl === plan.styleImageUrl)?.materialId || "", detail: plan.materials?.find((item: { material: { imageUrl: string } }) => item.material.imageUrl === plan.detailImageUrl)?.materialId || "" };
         setActionNotice("已载入原方案。修改要求后生成，新结果会另存为新方案。");
@@ -111,6 +116,7 @@ export default function WorkbenchPage() {
         if (!response.ok) { setActionNotice("查询暂时失败，将自动继续查询；无需重复生成"); timer = setTimeout(poll, 10000); return; }
         if (!restored && job.input) {
           setRoomImageUrl(job.input.roomImageUrl); setStyleImageUrl(job.input.styleImageUrl); setDetailImageUrl(job.input.detailImageUrl);
+          setSupplementalImages(job.input.supplementalImages || []);
           setPrompt(job.effectivePrompt || job.input.optimizedPrompt); setOriginalPrompt(job.input.originalPrompt || job.input.optimizedPrompt);
           setNegativePrompt(job.input.negativePrompt || ""); setFidelity(job.input.fidelity);
           setImageAnalysis(job.input.imageAnalysis ? JSON.parse(job.input.imageAnalysis) : null);
@@ -199,6 +205,7 @@ export default function WorkbenchPage() {
         roomImageUrl,
         styleImageUrl,
         detailImageUrl,
+        supplementalImages,
         materialSummary: imageAnalysis
           ? `${imageAnalysis.styleSummary}；${imageAnalysis.materialSummary}`
           : materialSummary,
@@ -273,7 +280,7 @@ export default function WorkbenchPage() {
     try {
       const result = await postJson<MaterialAnalysis>(
         "/api/ai/analyze-materials",
-        { roomImageUrl, styleImageUrl, detailImageUrl },
+        { roomImageUrl, styleImageUrl, detailImageUrl, supplementalImages },
       );
       setImageAnalysis(result);
       updatePrompt(result.templatePrompt);
@@ -297,6 +304,7 @@ export default function WorkbenchPage() {
           roomImageUrl,
           styleImageUrl,
           detailImageUrl,
+        supplementalImages,
           optimizedPrompt: prompt,
           negativePrompt,
           fidelity,
@@ -374,7 +382,8 @@ export default function WorkbenchPage() {
         sampleImageUrl: styleImageUrl,
         styleImageUrl,
         detailImageUrl,
-        imageAnalysis: imageAnalysis ? JSON.stringify(imageAnalysis) : "{}",
+        supplementalImages,
+        imageAnalysis: JSON.stringify({...imageAnalysis,supplementalImages}),
         originalPrompt,
         optimizedPrompt: prompt,
         negativePrompt,
@@ -467,13 +476,14 @@ export default function WorkbenchPage() {
 
     <div className="workbench-grid">
       <section className="studio-card space-y-6 p-5 sm:p-6">
-        <div><h2 className="text-lg font-semibold text-stone-900">图片与要求</h2><p className="mt-2 text-xs leading-6 text-stone-500">三张图：房间全景、窗帘款式、面料近照。JPG / PNG / WebP，每张不超过 4MB。</p></div>
+        <div><h2 className="text-lg font-semibold text-stone-900">图片与要求</h2><p className="mt-2 text-xs leading-6 text-stone-500">房间尽量拍到完整窗户；款式拍到帘头和下摆；面料靠近拍、关掉滤镜。每张不超过4MB。</p></div>
         <div className="grid grid-cols-3 gap-3">
           <UploadSlot title="房间图片" url={previews.room || roomImageUrl} busy={busyAction !== null || Boolean(uploads.room)} uploading={Boolean(uploads.room)} onUpload={file => void uploadImage(file, "room")} />
           <UploadSlot title="款式图片" url={previews.style || styleImageUrl} busy={busyAction !== null || Boolean(uploads.style)} uploading={Boolean(uploads.style)} onUpload={file => void uploadImage(file, "style")} />
           <UploadSlot title="面料图片" url={previews.detail || detailImageUrl} busy={busyAction !== null || Boolean(uploads.detail)} uploading={Boolean(uploads.detail)} onUpload={file => void uploadImage(file, "detail")} />
         </div>
         {[roomImageUrl, styleImageUrl, detailImageUrl].every(url => url.startsWith("/demo/")) && <p className="text-xs text-stone-500">已放入示例图，可以直接体验；点击图片换成自己的样本。</p>}
+        <PhotoAssist primary={[{url:roomImageUrl,role:"room"},{url:styleImageUrl,role:"style"},{url:detailImageUrl,role:"detail"}]} photos={supplementalImages} disabled={busyAction !== null} onUploading={setSupplementUploading} onChange={photos=>{setSupplementalImages(photos);setNegativePrompt("");clearResult();}}/>
         {uploadError && <p role="alert" className="text-sm text-red-600">{uploadError}</p>}
         <label className="block text-sm font-medium text-stone-700">生成要求<textarea aria-label="生成要求" rows={5} value={prompt} disabled={busyAction !== null} onChange={event => updatePrompt(event.target.value)} placeholder="例如：保留房间布局，换成浅灰色双层窗帘。" className="workbench-input mt-3 resize-y leading-7" /></label>
         <details className="workbench-options">

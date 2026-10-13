@@ -7,6 +7,7 @@ import {
 import { AiUnavailableError } from "@/lib/ai/errors";
 import { createGroundedPrompt } from "@/lib/ai/grounded-prompt";
 import { sampleObservationGuide, sampleExclusionNegative } from "@/lib/ai/sample-observation";
+import type { SupplementalImage } from "@/lib/photo-types";
 import {
   saveGeneratedImage,
   toBailianImageReference,
@@ -24,6 +25,7 @@ export async function prepareImageGeneration(input: {
   imageAnalysis: string;
   referenceImageUrl?: string;
   groundedPrompt?: string;
+  supplementalImages?: SupplementalImage[];
 }, asyncMode = false) {
   const config = getBailianConfig();
 
@@ -35,7 +37,9 @@ export async function prepareImageGeneration(input: {
   const [references, size] = await Promise.all([Promise.all(
     [baseImageUrl, input.styleImageUrl, input.detailImageUrl].map(asyncMode ? toAsyncImageReference : toBailianImageReference),
   ), roomImageOutputSize(baseImageUrl)]);
-  const observed = input.groundedPrompt ? null : await createGroundedPrompt(references, input.optimizedPrompt, input.fidelity as "strict" | "balanced" | "creative");
+  const supplements = input.supplementalImages ?? [];
+  const extraReferences = input.groundedPrompt ? [] : await Promise.all(supplements.map(photo => toAsyncImageReference(photo.url)));
+  const observed = input.groundedPrompt ? null : await createGroundedPrompt([...references,...extraReferences], input.optimizedPrompt, input.fidelity as "strict" | "balanced" | "creative", supplements.map(photo => photo.role));
   const groundedPrompt = input.groundedPrompt ?? observed!.optimizedPrompt;
   const spatialGuide = observed ? `实际图片识别：\n房间：${observed.roomSummary}\n款式：${observed.styleSummary}\n材质：${observed.materialSummary}` : "";
   const imageRoleText = "图1是原房间，图2是窗帘整体款式，图3是材质细节。图1是唯一的空间与家具布局基准；图2和图3仅提取窗帘，不复制其中的窗户、家具、摆件、背景装修或构图。";

@@ -48,6 +48,7 @@ describe("validators", () => {
       roomImageUrl: "/uploads/room.jpg",
       styleImageUrl: "/uploads/style.jpg",
       detailImageUrl: "/uploads/detail.jpg",
+      supplementalImages: [],
     });
   });
 

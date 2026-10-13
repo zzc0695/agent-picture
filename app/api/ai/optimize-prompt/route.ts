@@ -32,8 +32,8 @@ export async function POST(request: Request) {
   if (!images.success) return NextResponse.json({ error: "请先上传房间图、款式图和材质图，再根据图片润色要求" }, { status: 400 });
   try {
     const result = await trackedText(session.merchantId, "prompt_optimization", userPrompt, async () => {
-      const references = await Promise.all([images.data.roomImageUrl, images.data.styleImageUrl, images.data.detailImageUrl].map(toAsyncImageReference));
-      return createGroundedPrompt(references, userPrompt, fidelity);
+      const references = await Promise.all([images.data.roomImageUrl, images.data.styleImageUrl, images.data.detailImageUrl,...images.data.supplementalImages.map(photo => photo.url)].map(toAsyncImageReference));
+      return createGroundedPrompt(references, userPrompt, fidelity, images.data.supplementalImages.map(photo => photo.role));
     });
 
     return NextResponse.json(result);

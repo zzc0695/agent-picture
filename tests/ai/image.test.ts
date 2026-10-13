@@ -21,6 +21,7 @@ vi.mock("@/lib/files/storage", () => ({
   saveGeneratedImage,
   toBailianImageReference,
   roomImageOutputSize: vi.fn(async () => "1360*768"),
+  toAsyncImageReference: vi.fn(async (url:string)=>`extra:${url}`),
 }));
 
 describe("generateEffectImage", () => {
@@ -155,7 +156,7 @@ describe("generateEffectImage", () => {
     expect(text).toContain('号码牌、价格牌');
     expect(result.negativePrompt).toContain('品牌logo牌');
     expect(text).toContain('沙发在画面左侧');
-    expect(createGroundedPrompt).toHaveBeenCalledWith(['data:image/jpeg;base64,/room.png','data:image/jpeg;base64,/style.png','data:image/jpeg;base64,/detail.png'], '换成蓝色', 'balanced');
+    expect(createGroundedPrompt).toHaveBeenCalledWith(['data:image/jpeg;base64,/room.png','data:image/jpeg;base64,/style.png','data:image/jpeg;base64,/detail.png'], '换成蓝色', 'balanced', []);
   });
 
   it("reuses automatic room observations during a submission retry", async () => {
@@ -166,6 +167,13 @@ describe("generateEffectImage", () => {
     expect(result.content.find(part => 'text' in part)?.text).toContain('床位于窗户左侧');
   });
 
+  it("uses supplemental images for observation while keeping only three generation references", async () => {
+    process.env.DASHSCOPE_API_KEY='test-key';
+    const {prepareImageGeneration}=await import('@/lib/ai/image');
+    const result=await prepareImageGeneration({roomImageUrl:'/room.png',styleImageUrl:'/style.png',detailImageUrl:'/detail.png',optimizedPrompt:'还原样本',negativePrompt:'',fidelity:'strict',imageAnalysis:'',supplementalImages:[{url:'/heading.png',role:'style'}]});
+    expect(createGroundedPrompt).toHaveBeenCalledWith(expect.arrayContaining(['extra:/heading.png']),'还原样本','strict',['style']);
+    expect(result.content.filter(part=>'image' in part)).toHaveLength(3);
+  });
   it("does not submit a generation when image recognition fails", async () => {
     process.env.DASHSCOPE_API_KEY = 'test-key';
     createGroundedPrompt.mockRejectedValue(new Error('timeout'));

@@ -23,6 +23,7 @@ export const materialAnalysisRequestSchema = z.object({
   roomImageUrl: z.string().min(1),
   styleImageUrl: z.string().min(1),
   detailImageUrl: z.string().min(1),
+  supplementalImages: z.array(z.object({url:z.string().min(1),role:z.enum(["room","style","detail"])})).max(2).default([]),
 });
 
 export const materialAnalysisResultSchema = z.object({
@@ -36,6 +37,7 @@ export const imageGenerationRequestSchema = z.object({
   roomImageUrl: z.string().min(1),
   styleImageUrl: z.string().min(1),
   detailImageUrl: z.string().min(1),
+  supplementalImages: z.array(z.object({url:z.string().min(1),role:z.enum(["room","style","detail"])})).max(2).default([]),
   optimizedPrompt: z.string().min(1),
   negativePrompt: z.string().default(""),
   fidelity: fidelitySchema,
