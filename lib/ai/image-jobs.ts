@@ -22,17 +22,20 @@ export async function startImageJob(merchantId: string, body: unknown) {
   const started = Date.now();
   let stage = "references";
   let referenceMs = 0;
+  let spatialGuide: string | undefined;
   try {
-    const { config, content, negativePrompt, size } = await prepareImageGeneration(input, true);
+    const prepared = await prepareImageGeneration(input, true);
+    const { config, content, negativePrompt, size } = prepared;
+    spatialGuide = prepared.spatialGuide;
     referenceMs = Date.now() - started;
     stage = "submission";
     const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt, size });
     return view(await db.generationRecord.update({ where: { id: job.id }, data: {
-      status: "running", providerTaskId, timings: { referenceMs, submissionMs: Date.now() - started - referenceMs } } }));
+      status: "running", providerTaskId, timings: { referenceMs, submissionMs: Date.now() - started - referenceMs, ...(spatialGuide ? { spatialGuide } : {}) } } }));
   } catch (error) {
     if (stage === "submission" && isPreRequestConnectionFailure(error)) {
       return view(await db.generationRecord.update({ where: { id: job.id }, data: { status: "submitting", leaseUntil: null,
-        failureReason: "连接暂时失败，正在等待自动重试", timings: { stage: "connection", attempts: 1, nextAttemptAt: Date.now() + 10000, referenceMs } } }));
+        failureReason: "连接暂时失败，正在等待自动重试", timings: { stage: "connection", attempts: 1, nextAttemptAt: Date.now() + 10000, referenceMs, ...(spatialGuide ? { spatialGuide } : {}) } } }));
     }
     await db.generationRecord.update({ where: { id: job.id }, data: { status: "failed",
       failureReason: "参考图读取或任务提交失败，请检查图片后重试", timings: { stage, referenceMs, totalMs: Date.now() - started } } });
@@ -61,7 +64,7 @@ export async function pollImageJob(merchantId: string, id: string) {
     if (!claimed.count) return view(job);
     try {
       const input = imageGenerationRequestSchema.parse(job.inputData);
-      const { config, content, negativePrompt, size } = await prepareImageGeneration(input, true);
+      const { config, content, negativePrompt, size } = await prepareImageGeneration({ ...input, spatialGuide: typeof timings.spatialGuide === "string" ? timings.spatialGuide : undefined }, true);
       const providerTaskId = await submitBailianImage(config.apiKey!, config.imageModel, content, { negativePrompt, size });
       return view(await db.generationRecord.update({ where: { id }, data: { status: "running", providerTaskId, leaseUntil: null,
         failureReason: null, timings: { ...timings, stage: "model", attempts } } }));

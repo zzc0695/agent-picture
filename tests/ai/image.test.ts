@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const generateBailianImage = vi.hoisted(() => vi.fn());
 const saveGeneratedImage = vi.hoisted(() => vi.fn());
 const toBailianImageReference = vi.hoisted(() => vi.fn());
+const describeRoomLayout = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/ai/room-layout", () => ({ describeRoomLayout }));
 
 vi.mock("@/lib/ai/bailian", () => ({
   getBailianConfig: () => ({
@@ -31,6 +33,7 @@ describe("generateEffectImage", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    describeRoomLayout.mockResolvedValue("保留原位：沙发在画面左侧，茶几位于前景中央，窗帘在沙发后面");
     delete process.env.DASHSCOPE_API_KEY;
     toBailianImageReference.mockImplementation(async (url: string) => {
       return "data:image/jpeg;base64," + url;
@@ -149,6 +152,24 @@ describe("generateEffectImage", () => {
     const text=result.content.find(part=>'text' in part)?.text;
     expect(text).toContain('不移动床、沙发、桌椅');
     expect(text).toContain('只调整原窗户对应的窗帘区域');
+    expect(text).toContain('沙发在画面左侧');
+    expect(describeRoomLayout).toHaveBeenCalledWith('data:image/jpeg;base64,/room.png');
+  });
+
+  it("reuses automatic room observations during a submission retry", async () => {
+    process.env.DASHSCOPE_API_KEY = 'test-key';
+    const { prepareImageGeneration } = await import('@/lib/ai/image');
+    const result = await prepareImageGeneration({ roomImageUrl:'/room.png',styleImageUrl:'/style.png',detailImageUrl:'/detail.png',optimizedPrompt:'蓝色窗帘',negativePrompt:'',fidelity:'balanced',imageAnalysis:'',spatialGuide:'保留原位：床位于窗户左侧' });
+    expect(describeRoomLayout).not.toHaveBeenCalled();
+    expect(result.content.find(part => 'text' in part)?.text).toContain('床位于窗户左侧');
+  });
+
+  it("still generates with the original-room constraints when observation is unavailable", async () => {
+    process.env.DASHSCOPE_API_KEY = 'test-key';
+    describeRoomLayout.mockRejectedValue(new Error('timeout'));
+    const { prepareImageGeneration } = await import('@/lib/ai/image');
+    const result = await prepareImageGeneration({ roomImageUrl:'/room.png',styleImageUrl:'/style.png',detailImageUrl:'/detail.png',optimizedPrompt:'蓝色窗帘',negativePrompt:'',fidelity:'balanced',imageAnalysis:'' });
+    expect(result.content.find(part => 'text' in part)?.text).toContain('不移动床、沙发、桌椅');
   });
 
 });
