@@ -1,3 +1,4 @@
+import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
@@ -6,7 +7,10 @@ import { readSessionToken, sessionCookieName } from "@/lib/auth/session";
 
 export async function getMerchantSession(): Promise<MerchantSession | null> {
   const jar = await cookies();
-  return readSessionToken(jar.get(sessionCookieName)?.value);
+  const session = await readSessionToken(jar.get(sessionCookieName)?.value);
+  if (!session) return null;
+  const merchant = await db.merchant.findUnique({ where: { id: session.merchantId } });
+  return merchant && !merchant.disabled ? { ...session, email: merchant.email } : null;
 }
 
 export async function requireMerchantSession() {

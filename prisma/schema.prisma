@@ -10,6 +10,10 @@ model Merchant {
   id           String             @id @default(cuid())
   name         String
   email        String             @unique
+  disabled Boolean @default(false)
+  dailyImages Int?
+  dailyText Int?
+  concurrentImages Int?
   passwordHash String
   createdAt    DateTime           @default(now())
   materials    Material[]

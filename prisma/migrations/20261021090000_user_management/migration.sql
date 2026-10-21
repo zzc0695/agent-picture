@@ -1,0 +1,1 @@
+ALTER TABLE "Merchant" ADD COLUMN "disabled" BOOLEAN NOT NULL DEFAULT false, ADD COLUMN "dailyImages" INTEGER, ADD COLUMN "dailyText" INTEGER, ADD COLUMN "concurrentImages" INTEGER;

@@ -1,4 +1,8 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -29,22 +33,22 @@ export function PlanManager({ plan, customers }: { plan: Plan; customers: { id: 
     <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void run(async () => { await request(base, "PATCH", { ...form, customerId: form.customerId || null }); setNotice("方案已更新"); router.refresh(); }); }}>
       <div className="grid gap-4 md:grid-cols-3">
         <label className="text-sm">关联客户<select className={field} value={form.customerId} onChange={(event) => { const id = event.target.value; setForm({ ...form, customerId: id, customerName: customers.find(customer => customer.id === id)?.name ?? form.customerName }); }}><option value="">仅填写称呼</option>{customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
-        <label className="text-sm">客户称呼<input className={field} value={form.customerName} required maxLength={80} disabled={Boolean(form.customerId)} onChange={(event) => setForm({ ...form, customerName: event.target.value })} /></label>
+        <label className="text-sm">客户称呼<Input className={field} value={form.customerName} required maxLength={80} disabled={Boolean(form.customerId)} onChange={(event) => setForm({ ...form, customerName: event.target.value })} /></label>
         <label className="text-sm">状态<select className={field} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="draft">草稿</option><option value="ready">已生成</option><option value="delivered">已交付</option></select></label>
       </div>
-      <label className="block text-sm">房间 / 内部备注<input className={field} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
-      <details><summary className="cursor-pointer text-sm text-sage">修改文案与客户方案说明</summary><div className="mt-4 space-y-4">{([['shortVideoScript', '短视频脚本'], ['socialCopy', '社交分享文案'], ['customerScript', '客户方案说明（交付页可见）']] as const).map(([key, label]) => <label key={key} className="block text-sm">{label}<textarea className={field} rows={5} value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></label>)}</div></details>
-      <button disabled={busy} className="rounded-xl bg-sage px-5 py-3 text-sm text-white disabled:opacity-50">保存修改</button>
+      <label className="block text-sm">房间 / 内部备注<Input className={field} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+      <details><summary className="cursor-pointer text-sm text-sage">修改文案与客户方案说明</summary><div className="mt-4 space-y-4">{([['shortVideoScript', '短视频脚本'], ['socialCopy', '社交分享文案'], ['customerScript', '客户方案说明（交付页可见）']] as const).map(([key, label]) => <label key={key} className="block text-sm">{label}<Textarea className={field} rows={5} value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></label>)}</div></details>
+      <Button type="submit" disabled={busy}>保存修改</Button>
     </form>
     <div className="space-y-3 border-t border-stone-200 pt-5">
       <p className="text-sm text-stone-500">客户无需登录即可查看。链接有效 7 天，撤销后立即失效。修改方案后交付页同步更新；请先保存修改。</p>
       <div className="flex flex-wrap gap-3">
-        <button disabled={busy || !plan.primaryImageUrl} className="rounded-xl border border-stone-200 px-4 py-2 text-sm disabled:opacity-50" onClick={() => void run(async () => { setShare(await request(`${base}/share`, "POST")); setNotice("交付链接已就绪"); })}>{share ? "查看交付链接" : "创建交付链接"}</button>
-        {share && <><a className="rounded-xl border border-stone-200 px-4 py-2 text-sm text-sage" href={share.path} target="_blank" rel="noreferrer">预览 / 打印 PDF</a><button disabled={busy} className="rounded-xl border border-stone-200 px-4 py-2 text-sm" onClick={() => void run(async () => { await navigator.clipboard.writeText(`${window.location.origin}${share.path}`); setNotice("交付链接已复制"); })}>复制链接</button><button disabled={busy} className="px-3 text-sm text-stone-500" onClick={() => void run(async () => { await request(`${base}/share`, "DELETE"); setShare(null); setNotice("交付链接已撤销"); router.refresh(); })}>撤销分享</button></>}
+        <Button disabled={busy || !plan.primaryImageUrl} className="rounded-xl border border-stone-200 px-4 py-2 text-sm disabled:opacity-50" onClick={() => void run(async () => { setShare(await request(`${base}/share`, "POST")); setNotice("交付链接已就绪"); })}>{share ? "查看交付链接" : "创建交付链接"}</Button>
+        {share && <><a className="rounded-xl border border-stone-200 px-4 py-2 text-sm text-sage" href={share.path} target="_blank" rel="noreferrer">预览 / 打印 PDF</a><Button disabled={busy} className="rounded-xl border border-stone-200 px-4 py-2 text-sm" onClick={() => void run(async () => { await navigator.clipboard.writeText(`${window.location.origin}${share.path}`); setNotice("交付链接已复制"); })}>复制链接</Button><Button disabled={busy} className="px-3 text-sm text-stone-500" onClick={() => void run(async () => { await request(`${base}/share`, "DELETE"); setShare(null); setNotice("交付链接已撤销"); router.refresh(); })}>撤销分享</Button></>}
       </div>
       {share && <p className="break-all text-xs text-stone-500">{share.path} · 到期：{new Date(share.expiresAt).toLocaleString("zh-CN")}</p>}
     </div>
     {notice && <p role="status" className="text-sm text-sage">{notice}</p>}{error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    <button disabled={busy} className="text-sm text-red-600" onClick={() => { if (window.confirm("删除这个方案？关联的分享链接也会失效。")) void run(async () => { await request(base, "DELETE"); router.push("/plans"); router.refresh(); }); }}>删除方案</button>
+    <Button disabled={busy} className="text-sm text-red-600" onClick={() => { if (window.confirm("删除这个方案？关联的分享链接也会失效。")) void run(async () => { await request(base, "DELETE"); router.push("/plans"); router.refresh(); }); }}>删除方案</Button>
   </section>;
 }

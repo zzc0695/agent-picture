@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 export function MaterialCreateForm() {
@@ -14,5 +17,5 @@ export function MaterialCreateForm() {
       if (!saved.ok) throw new Error((await saved.json()).error || "素材保存失败"); form.reset(); router.refresh();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "保存失败，请重试"); } finally { setBusy(false); }
   }
-  return <details className="studio-card mb-6 p-5"><summary className="cursor-pointer font-medium">添加我的素材</summary><form onSubmit={submit} className="mt-4 grid gap-4 sm:grid-cols-2"><fieldset disabled={busy} className="contents">{([['name','素材名称'],['category','分类（款式 / 面料等）'],['color','颜色'],['fabric','材质'],['priceRange','价格说明（不确定可填待询价）']] as const).map(([name,label]) => <label key={name} className="text-sm">{label}<input name={name} required maxLength={160} className="mt-2 w-full rounded-lg border border-stone-200 p-3" /></label>)}<label className="text-sm">素材图片<input name="file" type="file" required accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm" /></label><label className="text-sm">卖点（选填）<input name="sellingPoints" className="mt-2 w-full rounded-lg border border-stone-200 p-3" /></label><button className="rounded-xl bg-sage px-5 py-3 text-white">{busy ? "保存中..." : "保存到我的素材库"}</button></fieldset>{error && <p role="alert" className="text-sm text-red-600">{error}</p>}</form></details>;
+  return <details className="studio-card mb-6 p-5"><summary className="cursor-pointer font-medium">添加我的素材</summary><form onSubmit={submit} className="mt-4 grid gap-4 sm:grid-cols-2"><fieldset disabled={busy} className="contents">{([['name','素材名称'],['category','分类（款式 / 面料等）'],['color','颜色'],['fabric','材质'],['priceRange','价格说明（不确定可填待询价）']] as const).map(([name,label]) => <label key={name} className="text-sm">{label}<Input name={name} required maxLength={160} className="mt-2 w-full rounded-lg border border-stone-200 p-3" /></label>)}<label className="text-sm">素材图片<Input name="file" type="file" required accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm" /></label><label className="text-sm">卖点（选填）<Input name="sellingPoints" className="mt-2 w-full rounded-lg border border-stone-200 p-3" /></label><Button type="submit">{busy ? "保存中..." : "保存到我的素材库"}</Button></fieldset>{error && <p role="alert" className="text-sm text-red-600">{error}</p>}</form></details>;
 }

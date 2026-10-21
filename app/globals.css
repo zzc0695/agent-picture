@@ -10,6 +10,8 @@
   --sand: #91b1ab;
   --surface: #ffffff;
   --border: #dce5e9;
+  --control-radius: 8px;
+  --control-height: 44px;
 }
 
 @theme inline {
@@ -124,9 +126,9 @@ button:disabled {
   flex: 0 0 auto;
   align-items: center;
   gap: 7px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border-radius: var(--control-radius);
+  border: 1px solid transparent;
+  background: transparent;
   padding: 0 13px;
   color: #425562;
   font-size: 12px;
@@ -579,7 +581,7 @@ a.studio-card, .prompt-card { transition: border-color 180ms ease, box-shadow 18
 
   .studio-nav-link {
     width: 100%;
-    border-radius: 18px;
+    border-radius: var(--control-radius);
     justify-content: flex-start;
   }
 
@@ -870,3 +872,27 @@ a.studio-card, .prompt-card { transition: border-color 180ms ease, box-shadow 18
 }
 
 @media (prefers-reduced-motion: reduce) { .mobile-more-panel { animation: none; } }
+
+/* Nova semantic tokens, shared with the existing studio palette. */
+@theme inline {
+  --color-primary: var(--sage);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #edf2f5;
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: #edf2f5;
+  --color-muted-foreground: #536573;
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--sage);
+  --color-destructive: #b42318;
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --radius-md: 8px;
+}
+[data-slot="button"] { min-height: 44px; }
+[data-slot="input"]:not([type="file"]):not([type="checkbox"]):not([type="radio"]) { min-height: 44px; background-color: var(--surface); }
+[data-slot="textarea"] { background-color: var(--surface); }
+[data-slot="button"] svg { stroke-width: 1.7; }
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="button"] { transition: none; transform: none; }
+}

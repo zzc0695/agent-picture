@@ -2,9 +2,9 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { reserveUsage, usageConfig, usageDay, UsageLimitError } from "@/lib/usage";
 import { db } from "@/lib/db";
-const mocks = vi.hoisted(() => ({ count: vi.fn(), create: vi.fn(), transaction: vi.fn() }));
+const mocks = vi.hoisted(() => ({ count: vi.fn(), create: vi.fn(), transaction: vi.fn(), findUnique: vi.fn() }));
 vi.mock("@/lib/db", () => ({ db: { $transaction: mocks.transaction } }));
-beforeEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); mocks.transaction.mockImplementation(action => action({ generationRecord: mocks })); mocks.count.mockResolvedValue(0); mocks.create.mockResolvedValue({ id: "reserved" }); });
+beforeEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); mocks.transaction.mockImplementation(action => action({ generationRecord: mocks, merchant: mocks })); mocks.findUnique.mockResolvedValue({ disabled: false, dailyImages: null, dailyText: null, concurrentImages: null }); mocks.count.mockResolvedValue(0); mocks.create.mockResolvedValue({ id: "reserved" }); });
 it("resets at Beijing midnight and allows configurable unlimited counts", () => {
   expect(usageDay(new Date("2026-10-11T16:00:00Z"))).toMatchObject({ date: "2026-10-12", start: new Date("2026-10-11T16:00:00Z"), end: new Date("2026-10-12T16:00:00Z") });
   expect(usageConfig({ AI_DAILY_IMAGE_LIMIT: "0", AI_IMAGE_ESTIMATED_PRICE: "0.12" })).toMatchObject({ dailyImages: 0, imagePrice: 0.12 });
@@ -27,4 +27,13 @@ it("reserves unlimited usage with configured estimated cost in a serialized tran
   await reserveUsage({ merchantId: "m", type: "image_generation", inputSummary: "p" });
   expect(mocks.create).toHaveBeenCalledWith({ data: { merchantId: "m", type: "image_generation", inputSummary: "p", status: "submitting", usageUnits: 0, estimatedCost: 0.25 } });
   expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
+});
+
+it("enforces a merchant override and blocks disabled accounts", async () => {
+ mocks.findUnique.mockResolvedValue({ disabled: false, dailyImages: 1, dailyText: null, concurrentImages: null });
+ mocks.count.mockResolvedValue(1);
+ await expect(reserveUsage({merchantId:"m",type:"image_generation",inputSummary:"p"})).rejects.toBeInstanceOf(UsageLimitError);
+ mocks.findUnique.mockResolvedValue({ disabled: true });
+ await expect(reserveUsage({merchantId:"m",type:"marketing_copy",inputSummary:"p"})).rejects.toThrow("账号已停用");
+ expect(mocks.create).not.toHaveBeenCalled();
 });

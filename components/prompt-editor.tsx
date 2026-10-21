@@ -1,4 +1,7 @@
 "use client";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+
 
 import { useState } from "react";
 
@@ -31,7 +34,7 @@ export function PromptEditor({
           模板
         </span>
       </div>
-      <textarea
+      <Textarea
         id="prompt"
         aria-label="生成要求"
         value={localValue}
@@ -40,7 +43,7 @@ export function PromptEditor({
         placeholder="请描述想要的窗帘效果、风格、材质、光线和需要保留的房间细节"
       />
       <div className="flex flex-wrap gap-2">
-        <button
+        <Button
           type="button"
           className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700"
           onClick={() =>
@@ -48,14 +51,14 @@ export function PromptEditor({
           }
         >
           插入模板
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700"
           onClick={() => update(template)}
         >
           替换整段
-        </button>
+        </Button>
       </div>
     </section>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { Info } from "lucide-react";
 
 export function FidelitySelector({
   value,
@@ -17,17 +18,18 @@ export function FidelitySelector({
     <section className="rounded-[10px] border border-neutral-200 bg-white p-4 shadow-[0_10px_30px_rgba(31,41,55,0.05)]">
       <div className="mb-3 flex items-center gap-1">
         <h2 className="text-sm font-semibold">还原度设置</h2>
-        <span className="text-xs text-neutral-400">ⓘ</span>
+        <Info size={14} className="text-stone-400" aria-hidden="true" />
       </div>
       <div className="grid grid-cols-3 gap-2">
         {options.map(([key, label, description]) => (
           <button
             key={key}
             type="button"
+            aria-pressed={value === key}
             onClick={() => onChange(key)}
             className={`min-h-24 rounded-lg border p-3 text-center transition ${
               value === key
-                ? "border-[#2b8178] bg-[#edf6f3] text-[#1e6d67]"
+                ? "border-sage bg-sage/10 text-sage"
                 : "border-neutral-200 bg-white text-neutral-700"
             }`}
           >

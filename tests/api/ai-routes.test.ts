@@ -21,6 +21,7 @@ vi.mock("@/lib/auth/require-session", () => ({
 
 vi.mock("@/lib/db", () => ({
   db: {
+    merchant: { findUnique: vi.fn(async () => ({ disabled: false, dailyImages: null, dailyText: null, concurrentImages: null })) },
     generationRecord: {
       create: vi.fn(),
       update: vi.fn(),
