@@ -1,3 +1,4 @@
+import { FeedbackForm } from "@/components/feedback-form";
 import { PreviewImage } from "@/components/preview-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -49,6 +50,7 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ id:
         <p className="mt-3 whitespace-pre-wrap text-sm leading-7">{plan.optimizedPrompt || plan.originalPrompt}</p>
         <p className="mt-4 text-sm text-stone-500">还原度：{{ strict: "严格", balanced: "平衡", creative: "创意" }[plan.fidelity] ?? plan.fidelity}</p>
       </section>
+      <FeedbackForm planId={plan.id} />
       {copies.map(([title, copy]) => <section key={title} className="studio-card p-6">
         <h2 className="font-semibold">{title}</h2>
         <p className="mt-3 whitespace-pre-wrap text-sm leading-7">{copy || "此方案未保存该文案。"}</p>

@@ -21,6 +21,7 @@ model Merchant {
   plans        CustomerPlan[]
   records      GenerationRecord[]
   customers    Customer[]
+  feedback     Feedback[]
   onboarded    Boolean            @default(true)
 }
 
@@ -83,6 +84,7 @@ model CustomerPlan {
   merchant         Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   materials        PlanMaterial[]
   records          GenerationRecord[]
+  feedback         Feedback[]
   @@index([sourcePlanId])
 }
 
@@ -113,6 +115,7 @@ model GenerationRecord {
   createdAt     DateTime      @default(now())
   merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   plan          CustomerPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  feedback      Feedback[]
   @@index([merchantId, createdAt])
 }
 
@@ -127,4 +130,21 @@ model Customer {
   merchant   Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   plans      CustomerPlan[]
   @@index([merchantId])
+}
+
+model Feedback {
+  id String @id @default(cuid())
+  merchantId String
+  planId String?
+  recordId String?
+  category String
+  message String
+  status String @default("open")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  plan CustomerPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  record GenerationRecord? @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  @@index([status, createdAt])
+  @@index([merchantId, createdAt])
 }
