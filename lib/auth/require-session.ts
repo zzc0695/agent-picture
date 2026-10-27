@@ -10,7 +10,7 @@ export async function getMerchantSession(): Promise<MerchantSession | null> {
   const session = await readSessionToken(jar.get(sessionCookieName)?.value);
   if (!session) return null;
   const merchant = await db.merchant.findUnique({ where: { id: session.merchantId } });
-  return merchant && !merchant.disabled ? { ...session, email: merchant.email } : null;
+  return merchant && !merchant.disabled ? { ...session, email: merchant.email ?? "", username: merchant.username ?? undefined } : null;
 }
 
 export async function requireMerchantSession() {

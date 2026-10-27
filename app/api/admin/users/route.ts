@@ -8,9 +8,9 @@ const schema = z.object({ id: z.string().min(1), name: z.string().trim().min(1).
 export async function GET(request: Request) {
  if (!await requireAdmin()) return NextResponse.json({ error: "需要管理员权限" }, { status: 403 });
  const url = new URL(request.url); const q = (url.searchParams.get("q") ?? "").slice(0,100); const page = Math.max(1, Math.min(100000, Math.floor(Number(url.searchParams.get("page")) || 1)));
- const where = { OR: [{ name: { contains: q, mode: "insensitive" as const } }, { email: { contains: q, mode: "insensitive" as const } }] };
+ const where = { OR: [{ username: { contains: q, mode: "insensitive" as const } }, { name: { contains: q, mode: "insensitive" as const } }, { email: { contains: q, mode: "insensitive" as const } }] };
  const total = await db.merchant.count({ where });
- const users = await db.merchant.findMany({ where, skip: (page-1)*20, take: 20, orderBy: { createdAt: "desc" }, select: { id: true, name: true, email: true, disabled: true, dailyImages: true, dailyText: true, concurrentImages: true, createdAt: true, records: { take: 5, orderBy: { createdAt: "desc" }, select: { id: true, type: true, status: true, createdAt: true } } } });
+ const users = await db.merchant.findMany({ where, skip: (page-1)*20, take: 20, orderBy: { createdAt: "desc" }, select: { id: true, name: true, email: true, username: true, disabled: true, dailyImages: true, dailyText: true, concurrentImages: true, createdAt: true, records: { take: 5, orderBy: { createdAt: "desc" }, select: { id: true, type: true, status: true, createdAt: true } } } });
  return NextResponse.json({ total, users: await Promise.all(users.map(async u => ({ ...u, usage: await usageSummary(u.id) }))) });
 }
 export async function PATCH(request: Request) {

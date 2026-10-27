@@ -10,5 +10,5 @@ export default async function DashboardLayout({
 }) {
   const session = await requirePageMerchantSession();
 
-  return <AppShell accountEmail={session.email}><Suspense fallback={null}><PersistentWorkbench key={session.merchantId} /></Suspense>{children}</AppShell>;
+  return <AppShell accountEmail={session.email} accountName={session.username}><Suspense fallback={null}><PersistentWorkbench key={session.merchantId} /></Suspense>{children}</AppShell>;
 }

@@ -8,6 +8,7 @@ const secret = new TextEncoder().encode(
 export type MerchantSession = {
   merchantId: string;
   email: string;
+  username?: string;
 };
 
 export const sessionCookieName = cookieName;

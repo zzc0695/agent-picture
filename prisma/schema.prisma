@@ -9,7 +9,11 @@ datasource db {
 model Merchant {
   id           String             @id @default(cuid())
   name         String
-  email        String             @unique
+  email        String?            @unique
+  username     String?            @unique
+  invitationId String?
+  invitation   Invitation? @relation("RedeemedInvitation", fields: [invitationId], references: [id], onDelete: SetNull)
+  invitations  Invitation[] @relation("CreatedInvitations")
   disabled Boolean @default(false)
   dailyImages Int?
   dailyText Int?
@@ -147,4 +151,22 @@ model Feedback {
   record GenerationRecord? @relation(fields: [recordId], references: [id], onDelete: SetNull)
   @@index([status, createdAt])
   @@index([merchantId, createdAt])
+}
+
+model Invitation {
+  id String @id @default(cuid())
+  code String @unique
+  label String
+  maxUses Int
+  usedCount Int @default(0)
+  expiresAt DateTime
+  disabled Boolean @default(false)
+  dailyImages Int @default(5)
+  dailyText Int @default(10)
+  concurrentImages Int @default(1)
+  createdAt DateTime @default(now())
+  createdById String
+  createdBy Merchant @relation("CreatedInvitations", fields: [createdById], references: [id], onDelete: Cascade)
+  merchants Merchant[] @relation("RedeemedInvitation")
+  @@index([createdAt])
 }
