@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { isAdmin } from "@/lib/auth/admin";
 import { AppNavigation } from "@/components/app-navigation";
 import { LogoutButton } from "@/components/logout-button";
@@ -17,13 +16,10 @@ export function AppShell({ children, accountEmail, accountName }: { children: Re
               DESIGN STUDIO
             </p>
           </div>
-          <AppNavigation />
-          {accountEmail && isAdmin(accountEmail) && <Link className="p-3 text-sm" href="/admin/users">用户管理</Link>}
-          {accountEmail && isAdmin(accountEmail) && <Link className="p-3 text-sm" href="/admin/feedback">用户反馈</Link>}
-          {accountEmail && isAdmin(accountEmail) && <Link className="p-3 text-sm" href="/admin/invitations">试用邀请</Link>}
+          <AppNavigation admin={!!accountEmail && isAdmin(accountEmail)} />
           <div className="desktop-navigation"><LogoutButton /></div>
         </nav>
-        <main className="studio-main">{(accountName || accountEmail) && <p className="px-4 pt-3 text-xs text-stone-500">当前账号：{accountName || accountEmail} · 素材、客户与方案按账号独立保存</p>}{children}</main>
+        <main className="studio-main">{(accountName || accountEmail) && <p className="break-all px-4 pt-3 text-xs leading-5 text-stone-500">当前账号：{accountName || accountEmail} · 素材、客户与方案按账号独立保存</p>}{children}</main>
       </div>
     </div>
   );
