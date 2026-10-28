@@ -26,7 +26,7 @@ export async function prepareImageGeneration(input: {
   referenceImageUrl?: string;
   groundedPrompt?: string;
   supplementalImages?: SupplementalImage[];
-}, asyncMode = false) {
+}, asyncMode = false, onStage?: (stage: "references" | "analysis") => void) {
   const config = getBailianConfig();
 
   if (!config.apiKey) {
@@ -34,11 +34,13 @@ export async function prepareImageGeneration(input: {
   }
 
   const baseImageUrl = input.roomImageUrl;
+  onStage?.("references");
   const [references, size] = await Promise.all([Promise.all(
     [baseImageUrl, input.styleImageUrl, input.detailImageUrl].map(asyncMode ? toAsyncImageReference : toBailianImageReference),
   ), roomImageOutputSize(baseImageUrl)]);
   const supplements = input.supplementalImages ?? [];
   const extraReferences = input.groundedPrompt ? [] : await Promise.all(supplements.map(photo => toAsyncImageReference(photo.url)));
+  onStage?.("analysis");
   const observed = input.groundedPrompt ? null : await createGroundedPrompt([...references,...extraReferences], input.optimizedPrompt, input.fidelity as "strict" | "balanced" | "creative", supplements.map(photo => photo.role));
   const groundedPrompt = input.groundedPrompt ?? observed!.optimizedPrompt;
   const spatialGuide = observed ? `实际图片识别：\n房间：${observed.roomSummary}\n款式：${observed.styleSummary}\n材质：${observed.materialSummary}` : "";

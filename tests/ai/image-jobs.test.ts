@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { startImageJob, pollImageJob } from "@/lib/ai/image-jobs";
 import { db } from "@/lib/db";
 import { getBailianImageTask, submitBailianImage } from "@/lib/ai/bailian";
-import { persistEffectImage } from "@/lib/ai/image";
+import { persistEffectImage, prepareImageGeneration } from "@/lib/ai/image";
 vi.mock("@/lib/usage", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/usage")>(), reserveUsage: vi.fn(async (input) => db.generationRecord.create({ data: { ...input, status: "submitting", usageUnits: 0 } })) }));
 vi.mock("@/lib/db", () => ({ db: { generationRecord: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }, customerPlan: { findFirst: vi.fn() }, material: { count: vi.fn() } } }));
 vi.mock("@/lib/ai/bailian", () => ({ getBailianConfig: () => ({ apiKey: "key" }), submitBailianImage: vi.fn(), getBailianImageTask: vi.fn() }));
@@ -12,6 +12,18 @@ const job = { id: "job", merchantId: "m", type: "image_generation", status: "run
 const input = { roomImageUrl: "/demo/room.png", styleImageUrl: "/demo/style.png", detailImageUrl: "/demo/detail.png", optimizedPrompt: "窗帘", fidelity: "balanced" };
 describe("durable image jobs", () => {
   beforeEach(() => { vi.clearAllMocks(); vi.mocked(db.generationRecord.update).mockImplementation(({ data }) => Promise.resolve({ ...job, ...data }) as never); });
+  it("distinguishes analysis failures from unreadable photos without submitting an image job", async () => {
+    vi.mocked(db.generationRecord.create).mockResolvedValue(job as never);
+    vi.mocked(prepareImageGeneration).mockImplementationOnce(async (_input, _async, onStage) => {
+      onStage?.("analysis");
+      throw new Error("Recognition temporarily unavailable");
+    });
+    await expect(startImageJob("m", input)).rejects.toThrow("Recognition temporarily unavailable");
+    expect(submitBailianImage).not.toHaveBeenCalled();
+    expect(db.generationRecord.update).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({
+      status:"failed", failureReason:expect.stringContaining("图片识别服务"), timings:expect.objectContaining({stage:"analysis"})
+    })}));
+  });
   it("scopes task lookup to the merchant before contacting the provider", async () => {
     vi.mocked(db.generationRecord.findFirst).mockResolvedValue(null);
     expect(await pollImageJob("other", "job")).toBeNull();

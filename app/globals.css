@@ -101,6 +101,7 @@ button:disabled {
 
 .studio-main {
   min-width: 0;
+  padding-top: env(safe-area-inset-top);
 }
 
 .studio-nav {
@@ -854,6 +855,7 @@ a.studio-card, .prompt-card { transition: border-color 180ms ease, box-shadow 18
 }
 
 @media (max-width: 767px) {
+  .records-page { padding: 20px 12px 28px; }
   .admin-page { padding: 20px 12px 28px; }
   .user-search input { flex-basis: 100%; width: 100%; }
   .user-search button { flex: 1; border: 1px solid var(--border); border-radius: 8px; background: white; }

@@ -5,6 +5,7 @@ import { AiUnavailableError, AiResourceNotFoundError, isPreRequestConnectionFail
 import { imageGenerationRequestSchema } from "@/lib/validators";
 import type { GenerationRecord } from "@prisma/client";
 import { reserveUsage } from "@/lib/usage";
+import { redactedError } from "./tracked-text";
 
 function view(job: GenerationRecord) {
   return { jobId: job.id, status: job.status, imageUrl: job.resultImageUrl, inputSummary: job.inputSummary,
@@ -25,7 +26,7 @@ export async function startImageJob(merchantId: string, body: unknown) {
   let referenceMs = 0;
   let groundedPrompt: string | undefined;
   try {
-    const prepared = await prepareImageGeneration(input, true);
+    const prepared = await prepareImageGeneration(input, true, value => { stage = value; });
     const { config, content, negativePrompt, size } = prepared;
     groundedPrompt = prepared.groundedPrompt;
     referenceMs = Date.now() - started;
@@ -38,10 +39,18 @@ export async function startImageJob(merchantId: string, body: unknown) {
       return view(await db.generationRecord.update({ where: { id: job.id }, data: { status: "submitting", leaseUntil: null,
         failureReason: "连接暂时失败，正在等待自动重试", timings: { stage: "connection", attempts: 1, nextAttemptAt: Date.now() + 10000, referenceMs, ...(groundedPrompt ? { groundedPrompt } : {}) } } }));
     }
+    const failureReason = stage === "analysis"
+      ? "图片识别服务暂时未能完成处理，请稍后重试。已上传的图片和要求会保留。"
+      : stage === "references"
+        ? "参考图片暂时读取失败，请稍后重试。已上传的图片和要求会保留。"
+        : "生图任务提交失败，请稍后重试。已上传的图片和要求会保留。";
+    const providerStatus = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : undefined;
     await db.generationRecord.update({ where: { id: job.id }, data: { status: "failed",
-      failureReason: "参考图读取或任务提交失败，请检查图片后重试", timings: { stage, referenceMs, totalMs: Date.now() - started } } });
+      failureReason, timings: { stage, referenceMs, totalMs: Date.now() - started, ...(providerStatus ? { providerStatus } : {}) } } });
     console.error(JSON.stringify({ event: "image_job_failed", jobId: job.id, stage, elapsedMs: Date.now() - started,
       errorType: error instanceof Error ? error.name : "unknown",
+      errorMessage: redactedError(error),
+      providerStatus,
       errorCode: error instanceof Error && error.cause && typeof error.cause === "object" && "code" in error.cause ? error.cause.code : undefined }));
     throw error;
   }

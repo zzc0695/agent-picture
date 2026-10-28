@@ -11,7 +11,7 @@ export default async function RecordsPage() {
   });
 
   return (
-    <div className="studio-page studio-library-page">
+    <div className="studio-page studio-library-page records-page">
       <PageHeader
         eyebrow="GENERATION HISTORY"
         title="生成记录"
@@ -21,8 +21,8 @@ export default async function RecordsPage() {
         <div className="grid gap-4">
           {records.map((record) => (
             <article key={record.id} className="studio-card p-5">
-              <div className="flex items-start gap-4">
-                <div className="grid size-12 flex-shrink-0 place-items-center rounded-2xl bg-sage text-white shadow-lg shadow-sage/20">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="hidden size-12 flex-shrink-0 place-items-center rounded-2xl bg-sage text-white shadow-lg shadow-sage/20 sm:grid">
                   <Activity size={20} strokeWidth={1.5} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -34,7 +34,7 @@ export default async function RecordsPage() {
                       {({ submitting: "提交中", running: "生成中", succeeded: "成功", failed: "失败" } as Record<string, string>)[record.status] ?? record.status} · 成功计数 {record.usageUnits}
                     </span>
                   </div>
-                  <p className="mt-3 text-[13px] leading-7 text-stone-600">
+                  <p className="mt-3 break-words text-[13px] leading-7 text-stone-600">
                     {record.inputSummary}
                   </p>
                   {record.timings && typeof record.timings === "object" && !Array.isArray(record.timings) && typeof record.timings.totalMs === "number" ? (
